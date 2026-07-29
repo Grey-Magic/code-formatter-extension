@@ -5,6 +5,7 @@ import {
   SqlFormatter,
   YamlFormatter,
   TomlFormatter,
+  BiomeFormatter,
 } from './wasm-formatters';
 import { clearWasmCache } from './wasm-loader';
 
@@ -85,6 +86,24 @@ describe('WASM Formatters', () => {
     it('should have correct metadata', () => {
       expect(formatter.metadata.id).toBe('toml-formatter');
       expect(formatter.metadata.languages).toContain('toml');
+    });
+
+    it('should be available', () => {
+      expect(formatter.isAvailable()).toBe(true);
+    });
+  });
+
+  describe('BiomeFormatter', () => {
+    const formatter = new BiomeFormatter();
+
+    it('should have correct metadata', () => {
+      expect(formatter.metadata.id).toBe('biome');
+      expect(formatter.metadata.name).toBe('Biome');
+      expect(formatter.metadata.languages).toContain('javascript');
+      expect(formatter.metadata.languages).toContain('typescript');
+      expect(formatter.metadata.languages).toContain('json');
+      expect(formatter.metadata.languages).toContain('css');
+      expect(formatter.metadata.capabilities.isFormatter).toBe(true);
     });
 
     it('should be available', () => {

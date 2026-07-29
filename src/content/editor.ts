@@ -37,6 +37,7 @@ const DARK_THEMES: ThemeName[] = [
 
 const themeCompartment = new Compartment();
 const languageCompartment = new Compartment();
+const wrapCompartment = new Compartment();
 
 let editorInstance: EditorView | null = null;
 let currentSettings: ExtensionSettings;
@@ -250,6 +251,7 @@ export async function createEditor(
     ]),
     languageCompartment.of(getLanguageExtension(language)),
     themeCompartment.of(themeExts),
+    wrapCompartment.of(currentSettings.wrapLines ? EditorView.lineWrapping : []),
     EditorView.editable.of(isEditable && !isHugeFile),
   ].filter(Boolean) as Extension[];
 
@@ -308,6 +310,13 @@ export function getEditorContent(): string {
 export function updateSettings(settings: ExtensionSettings): void {
   currentSettings = settings;
   applyTheme();
+  if (editorInstance) {
+    editorInstance.dispatch({
+      effects: wrapCompartment.reconfigure(
+        settings.wrapLines ? EditorView.lineWrapping : [],
+      ),
+    });
+  }
 }
 
 export function destroyEditor(): void {

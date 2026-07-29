@@ -222,6 +222,72 @@ export class YamlFormatter implements IFormatter {
   }
 }
 
+// Biome formatter (JavaScript/TypeScript/JSON/CSS)
+export class BiomeFormatter implements IFormatter {
+  readonly metadata: FormatterMetadata = {
+    id: "biome",
+    name: "Biome",
+    description: "Biome formatter for JavaScript, TypeScript, JSON, and CSS",
+    languages: ["javascript", "typescript", "json", "css"],
+    capabilities: {
+      isFormatter: true,
+      isOpinionated: true,
+      tolerant: false,
+    },
+  };
+
+  async format(
+    code: string,
+    language: string,
+    settings?: FormatterSettings,
+  ): Promise<FormatResult> {
+    try {
+      if (!isWasmSupported()) {
+        return {
+          success: false,
+          code,
+          error:
+            "WebAssembly is not supported in this browser. Biome formatting requires WASM.",
+        };
+      }
+
+      const biome = await loadWasmFormatter(
+        "biome_fmt_web.js",
+        "biome_fmt_bg.wasm",
+      );
+
+      // Map language to filename extension for Biome
+      const extensionMap: Record<string, string> = {
+        javascript: "index.js",
+        typescript: "index.ts",
+        json: "index.json",
+        css: "index.css",
+      };
+      const filename = extensionMap[language] || "index.js";
+
+      const formatted = biome.format(code, filename, {
+        indentStyle: settings?.useTabs ? "tab" : "space",
+        indentWidth: settings?.indentSize ?? 2,
+        lineWidth: 80,
+      });
+      return { success: true, code: formatted };
+    } catch (error) {
+      return {
+        success: false,
+        code,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Biome formatting failed. Make sure WASM is enabled.",
+      };
+    }
+  }
+
+  isAvailable(): boolean {
+    return isWasmSupported();
+  }
+}
+
 // TOML formatter
 export class TomlFormatter implements IFormatter {
   readonly metadata: FormatterMetadata = {

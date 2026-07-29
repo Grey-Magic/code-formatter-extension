@@ -96,6 +96,9 @@ document.addEventListener("DOMContentLoaded", function (): void {
     document.getElementById(
       "format-on-paste-min-length",
     ) as HTMLInputElement | null;
+  const preferredFormatter: HTMLSelectElement | null = document.getElementById(
+    "preferred-formatter",
+  ) as HTMLSelectElement | null;
 
   // js-beautify options
   const e4x: HTMLInputElement | null = document.getElementById(
@@ -255,6 +258,8 @@ document.addEventListener("DOMContentLoaded", function (): void {
       "quoteStyleWasm",
       "keywordCase",
       "commaPosition",
+      // Formatter selection
+      "preferredFormatter",
     ];
 
     chrome.storage.sync.get(
@@ -322,6 +327,11 @@ document.addEventListener("DOMContentLoaded", function (): void {
         keywordCase!.value = result.keywordCase || defaultSettings.keywordCase;
         commaPosition!.value =
           result.commaPosition || defaultSettings.commaPosition;
+
+        // Formatter selection
+        preferredFormatter!.value =
+          result.preferredFormatter ||
+          (defaultSettings.preferredFormatter as string);
 
         syncLineHeightElements();
 
@@ -433,6 +443,12 @@ document.addEventListener("DOMContentLoaded", function (): void {
         commaPosition.value === "before" || commaPosition.value === "after"
           ? commaPosition.value
           : defaultSettings.commaPosition,
+      preferredFormatter:
+        preferredFormatter.value === "prettier" ||
+        preferredFormatter.value === "js-beautify" ||
+        preferredFormatter.value === "biome"
+          ? preferredFormatter.value
+          : "prettier",
     };
 
     chrome.storage.sync.set(settings, function (): void {

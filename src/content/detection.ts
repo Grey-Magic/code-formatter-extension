@@ -1,5 +1,5 @@
 import { EXTENSION_MAP } from "../shared/constants";
-import { detectLanguageFromUrl } from "../shared/utils";
+import { detectLanguageFromUrl, getLanguageFromFilename } from "../shared/utils";
 import type { LanguagePattern, DetectionResult } from "./types";
 
 const MIN_CONTENT_LENGTH = 50;
@@ -153,7 +153,23 @@ export function detectLanguage(content: string): string | null {
   }
 
   const pathname = window.location.pathname;
-  const lastSegment = pathname.split("/").pop() || "";
+  const segments = pathname.split("/").filter(Boolean);
+
+  // Check the full path for filenames like Dockerfile, Makefile, .env
+  const pathnameLang = getLanguageFromFilename(pathname);
+  if (pathnameLang && EXTENSION_MAP[pathnameLang]) {
+    return pathnameLang;
+  }
+
+  // Check each path segment for special filenames
+  for (const segment of segments) {
+    const segmentLang = getLanguageFromFilename(segment);
+    if (segmentLang) {
+      return segmentLang;
+    }
+  }
+
+  const lastSegment = segments.pop() || "";
   const ext = lastSegment.split(".").pop()?.split("?")[0].toLowerCase();
   if (ext && ext !== lastSegment && EXTENSION_MAP[ext]) {
     return EXTENSION_MAP[ext];

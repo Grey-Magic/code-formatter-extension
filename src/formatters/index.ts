@@ -10,5 +10,6 @@ export {
   SqlFormatter,
   YamlFormatter,
   TomlFormatter,
+  BiomeFormatter,
 } from './wasm-formatters';
 export * from './file-loader';

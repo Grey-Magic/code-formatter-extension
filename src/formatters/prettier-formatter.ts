@@ -82,6 +82,8 @@ async function loadPluginsForLanguage(language: string): Promise<any[]> {
     case "markdown":
       plugins.push(await loadPlugin("markdown"));
       break;
+    case "dockerfile":
+      break;
   }
 
   return plugins;
@@ -91,7 +93,7 @@ export class PrettierFormatter implements IFormatter {
   readonly metadata: FormatterMetadata = {
     id: "prettier",
     name: "Prettier",
-    description: "Opinionated code formatter for JS/TS/JSON/CSS/HTML",
+    description: "Opinionated code formatter for JS/TS/JSON/CSS/HTML/Markdown/Dockerfile",
     languages: [
       "javascript",
       "typescript",
@@ -101,6 +103,7 @@ export class PrettierFormatter implements IFormatter {
       "less",
       "html",
       "markdown",
+      "dockerfile",
     ],
     capabilities: {
       isFormatter: true,
@@ -159,6 +162,7 @@ export class PrettierFormatter implements IFormatter {
       less: "less",
       html: "html",
       markdown: "markdown",
+      dockerfile: "dockerfile",
     };
     return parsers[language.toLowerCase()] || "babel";
   }

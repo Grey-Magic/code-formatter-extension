@@ -279,6 +279,7 @@ async function autoFormatPage(): Promise<void> {
       openFileDialog,
       getCode: () => currentEditorCode,
       onDownload: downloadCode,
+      batchFormat: batchFormatAllBlocks,
     });
 
     const toolbar = createToolbar();
@@ -324,6 +325,42 @@ function setupMessageListener(): void {
       sendResponse({ status: "success", language: lang });
       return true;
     }
+
+    if (message.action === "formatSelection") {
+      const formatMsg = message as {
+        action: string;
+        language: string;
+        code: string;
+      };
+      const lang = formatMsg.language;
+      const code = formatMsg.code;
+
+      if (!code || !lang) {
+        sendResponse({ success: false, error: "Missing code or language" });
+        return true;
+      }
+
+      formatCode(code, lang).then((formatted) => {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          const selectedNode = range.startContainer;
+          const parentElement = selectedNode.parentElement;
+
+          if (parentElement && parentElement.tagName === "PRE") {
+            parentElement.textContent = formatted;
+            selectedNode.parentElement?.normalize();
+          } else if (selectedNode.nodeType === Node.TEXT_NODE) {
+            selectedNode.textContent = formatted;
+          }
+        }
+
+        sendResponse({ success: true, code: formatted });
+      });
+
+      return true;
+    }
+
     return false;
   });
 }
@@ -411,6 +448,32 @@ function setupKeyboardShortcuts(): void {
       keyEvent.preventDefault();
       openFileDialog();
     }
+
+    if ((keyEvent.ctrlKey || keyEvent.metaKey) && keyEvent.key === "s") {
+      keyEvent.preventDefault();
+      if (currentEditorCode && currentEditorLanguage) {
+        formatCode(currentEditorCode, currentEditorLanguage).then(
+          (formatted) => {
+            const editor = getEditor();
+            if (editor && formatted !== currentEditorCode) {
+              editor.dispatch({
+                changes: {
+                  from: 0,
+                  to: editor.state.doc.length,
+                  insert: formatted,
+                },
+              });
+              currentEditorCode = formatted;
+            }
+          },
+        );
+      }
+    }
+
+    if (keyEvent.ctrlKey && keyEvent.shiftKey && keyEvent.key === "B") {
+      keyEvent.preventDefault();
+      batchFormatAllBlocks();
+    }
   });
 }
 
@@ -428,6 +491,42 @@ function cleanup(): void {
 
   document.body?.classList.remove(CSS_CLASSES.LOADED);
   console.log("[Code Formatter] Cleanup completed");
+}
+
+async function batchFormatAllBlocks(): Promise<void> {
+  const preElements = document.querySelectorAll("pre");
+  if (preElements.length === 0) {
+    showToast("No code blocks found on this page.", "warning");
+    return;
+  }
+
+  showToast(`Formatting ${preElements.length} code block(s)...`, "info");
+
+  let successCount = 0;
+  let errorCount = 0;
+
+  for (const pre of preElements) {
+    const code = pre.textContent || "";
+    if (!code.trim()) continue;
+
+    const lang = detectLanguage(code);
+    if (!lang) continue;
+
+    try {
+      const formatted = await formatCode(code, lang);
+      if (formatted !== code) {
+        pre.textContent = formatted;
+        successCount++;
+      }
+    } catch {
+      errorCount++;
+    }
+  }
+
+  showToast(
+    `Batch format complete: ${successCount} formatted, ${errorCount} errors`,
+    successCount > 0 ? "success" : "error",
+  );
 }
 
 async function main(): Promise<void> {

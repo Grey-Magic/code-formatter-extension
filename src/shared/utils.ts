@@ -113,6 +113,41 @@ export function getLanguageFromFilename(filename: string): string | null {
     return null;
   }
 
+  const baseName = filename.split("/").pop() || filename;
+
+  // Handle special filenames without extensions
+  const specialFilenames: Record<string, string> = {
+    dockerfile: "dockerfile",
+    makefile: "makefile",
+    "docker-compose": "yaml",
+    ".eslintrc": "json",
+    ".prettierrc": "json",
+    ".babelrc": "json",
+    ".htaccess": "apache",
+    ".env": "dotenv",
+    ".gitignore": "gitignore",
+  };
+
+  const lowerBase = baseName.toLowerCase();
+  if (specialFilenames[lowerBase]) {
+    return specialFilenames[lowerBase];
+  }
+
+  // Handle Dockerfile.* variants (e.g., Dockerfile.prod, Dockerfile.staging)
+  if (lowerBase.startsWith("dockerfile")) {
+    return "dockerfile";
+  }
+
+  // Handle .env.* variants (e.g., .env.production)
+  if (lowerBase.startsWith(".env")) {
+    return "dotenv";
+  }
+
+  // Handle compose files without extension
+  if (lowerBase === "docker-compose" || lowerBase === "compose") {
+    return "yaml";
+  }
+
   const parts = filename.split(".");
   if (parts.length < 2) {
     return null;

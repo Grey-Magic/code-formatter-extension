@@ -195,6 +195,11 @@ function convertSettings(
     singleQuote: settings?.singleQuote ?? langDefaults?.singleQuote ?? true,
     semi: settings?.semi ?? langDefaults?.semi ?? true,
     trailingComma: settings?.trailingComma ?? "es5",
+    preferredFormatter:
+      (settings?.preferredFormatter as
+        | "prettier"
+        | "js-beautify"
+        | "biome") ?? "prettier",
   };
 }
 
@@ -451,6 +456,18 @@ function setupContextMenu(): void {
       title: "Format as TOML",
       contexts: ["selection"],
     });
+    chrome.contextMenus.create({
+      id: "formatDockerfile",
+      parentId: "codeFormatter",
+      title: "Format as Dockerfile",
+      contexts: ["selection"],
+    });
+    chrome.contextMenus.create({
+      id: "formatMakefile",
+      parentId: "codeFormatter",
+      title: "Format as Makefile",
+      contexts: ["selection"],
+    });
   });
 
   chrome.contextMenus.onClicked.addListener((info, tab) => {
@@ -462,7 +479,6 @@ function setupContextMenu(): void {
     }
 
     const language = CONTEXT_MENU_LANGUAGE_MAP[info.menuItemId as string];
-    if (!language) return;
     if (!language) return;
 
     // Send message with error handling
@@ -593,6 +609,10 @@ chrome.runtime.onInstalled.addListener((details) => {
 chrome.runtime.onStartup.addListener(() => {
   console.log("[Code Formatter] Extension started");
   initializeExtension();
+});
+
+chrome.action.onClicked.addListener(() => {
+  chrome.runtime.openOptionsPage();
 });
 
 initializeExtension();

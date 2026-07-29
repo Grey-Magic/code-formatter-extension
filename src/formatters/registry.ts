@@ -9,6 +9,7 @@ import {
   SqlFormatter,
   YamlFormatter,
   TomlFormatter,
+  BiomeFormatter,
 } from "./wasm-formatters";
 
 /**
@@ -18,6 +19,7 @@ import {
 export class FormatterRegistry {
   private formatters: Map<string, IFormatter> = new Map();
   private languageMap: Map<string, string> = new Map();
+  private languageFormatters: Map<string, string[]> = new Map();
 
   constructor() {
     this.registerDefaultFormatters();
@@ -35,6 +37,7 @@ export class FormatterRegistry {
     this.register(new SqlFormatter());
     this.register(new YamlFormatter());
     this.register(new TomlFormatter());
+    this.register(new BiomeFormatter());
     this.register(new FallbackFormatter());
   }
 
@@ -50,6 +53,11 @@ export class FormatterRegistry {
       // If multiple formatters support a language, the last one registered wins
       // (Prettier overrides js-beautify for web languages)
       this.languageMap.set(normalized, formatter.metadata.id);
+
+      // Track all formatters per language for the selector
+      const existing = this.languageFormatters.get(normalized) || [];
+      existing.push(formatter.metadata.id);
+      this.languageFormatters.set(normalized, existing);
     });
   }
 
@@ -57,8 +65,25 @@ export class FormatterRegistry {
    * Get the best formatter for a language
    * Priority: true formatters over beautifiers
    */
-  getFormatter(language: string): IFormatter | null {
+  getFormatter(
+    language: string,
+    preferredFormatterId?: string,
+  ): IFormatter | null {
     const normalized = normalizeLanguage(language);
+
+    // If a preferred formatter is specified, try to use it
+    if (preferredFormatterId) {
+      const preferred = this.formatters.get(preferredFormatterId);
+      if (
+        preferred &&
+        preferred.metadata.languages.some(
+          (l) => normalizeLanguage(l) === normalized,
+        )
+      ) {
+        return preferred;
+      }
+    }
+
     const formatterId = this.languageMap.get(normalized);
 
     if (formatterId) {
@@ -83,7 +108,7 @@ export class FormatterRegistry {
     language: string,
     settings?: FormatterSettings,
   ): Promise<FormatResult> {
-    const formatter = this.getFormatter(language);
+    const formatter = this.getFormatter(language, settings?.preferredFormatter);
 
     if (!formatter) {
       return {
@@ -122,12 +147,10 @@ export class FormatterRegistry {
    */
   getFormattersForLanguage(language: string): IFormatter[] {
     const normalized = normalizeLanguage(language);
-    const formatterId = this.languageMap.get(normalized);
-    if (formatterId) {
-      const formatter = this.formatters.get(formatterId);
-      return formatter ? [formatter] : [];
-    }
-    return [];
+    const formatterIds = this.languageFormatters.get(normalized) || [];
+    return formatterIds
+      .map((id) => this.formatters.get(id))
+      .filter((f): f is IFormatter => f !== undefined);
   }
 }
 

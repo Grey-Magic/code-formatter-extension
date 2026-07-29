@@ -62,6 +62,7 @@ type ApplyThemeCallback = () => void;
 type ToggleOriginalCallback = () => void;
 type OpenFileDialogCallback = () => void;
 type GetCodeCallback = () => string;
+type BatchFormatCallback = () => void;
 
 let onSaveSettings: SaveSettingsCallback | null = null;
 let onApplyTheme: ApplyThemeCallback | null = null;
@@ -69,6 +70,7 @@ let onToggleOriginal: ToggleOriginalCallback | null = null;
 let onOpenFileDialog: OpenFileDialogCallback | null = null;
 let onGetCode: GetCodeCallback | null = null;
 let onDownload: ((code: string, language: string) => void) | null = null;
+let onBatchFormat: BatchFormatCallback | null = null;
 
 export function initToolbar(
   settings: ExtensionSettings,
@@ -79,6 +81,7 @@ export function initToolbar(
     openFileDialog?: OpenFileDialogCallback;
     getCode?: GetCodeCallback;
     onDownload?: (code: string, language: string) => void;
+    batchFormat?: BatchFormatCallback;
   },
 ): void {
   currentSettings = settings;
@@ -88,6 +91,7 @@ export function initToolbar(
   onOpenFileDialog = callbacks.openFileDialog ?? null;
   onGetCode = callbacks.getCode ?? null;
   onDownload = callbacks.onDownload ?? null;
+  onBatchFormat = callbacks.batchFormat ?? null;
 }
 
 export function setEditorInstance(editor: EditorView | null): void {
@@ -502,6 +506,20 @@ export function createToolbar(): HTMLElement {
 
   toolbar.appendChild(createSeparator());
 
+  // Batch Format All button
+  const batchFormatBtn = createToolbarButton(
+    "code-formatter-batch-format",
+    "Format All Blocks (Ctrl+Shift+B)",
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>',
+    "Batch Format",
+  );
+  batchFormatBtn.addEventListener("click", () => {
+    onBatchFormat?.();
+  });
+  toolbar.appendChild(batchFormatBtn);
+
+  toolbar.appendChild(createSeparator());
+
   // Spacer
   const spacer = document.createElement("div");
   spacer.style.flex = "1";
@@ -532,6 +550,18 @@ export function createToolbar(): HTMLElement {
     onDownload?.(code, currentLanguage);
   });
   toolbar.appendChild(downloadBtn);
+
+  // Print button
+  const printBtn = createToolbarButton(
+    "code-formatter-print",
+    "Print Formatted Code",
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>',
+    "Print",
+  );
+  printBtn.addEventListener("click", () => {
+    window.print();
+  });
+  toolbar.appendChild(printBtn);
 
   return toolbar;
 }

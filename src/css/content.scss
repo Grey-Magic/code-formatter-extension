@@ -553,3 +553,67 @@ body.code-formatter-is-loaded {
   white-space: nowrap;
   font-family: $font-ui;
 }
+
+// Print styles
+@media print {
+  // Hide everything except the editor container
+  .code-formatter-toolbar,
+  .code-formatter-statusbar,
+  .code-formatter-original-toggle,
+  .code-formatter-download-options,
+  .code-formatter-close-btn,
+  .code-formatter-search-bar,
+  .code-formatter-drag-overlay {
+    display: none !important;
+  }
+
+  // Make the container fill the page
+  .code-formatter-editor-container {
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    z-index: auto !important;
+  }
+
+  // Make the editor fill the container
+  .code-formatter-editor {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  // Ensure code is visible
+  .cm-editor {
+    height: auto !important;
+    overflow: visible !important;
+
+    .cm-scroller {
+      overflow: visible !important;
+    }
+
+    .cm-content {
+      white-space: pre-wrap !important;
+      word-wrap: break-word !important;
+    }
+  }
+
+  // Hide gutters for cleaner print
+  .cm-gutters {
+    display: none !important;
+  }
+
+  // Ensure dark theme works on print
+  .cm-editor {
+    background: white !important;
+    color: black !important;
+  }
+
+  .cm-content {
+    color: black !important;
+  }
+}

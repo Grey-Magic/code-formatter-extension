@@ -40,33 +40,43 @@ interface ChangelogData {
  * The changelog data containing version information and categorized changes
  */
 const changelogData: ChangelogData = {
-  version: "1.9.4",
-  date: "2026-02-19",
+  version: "1.9.6",
+  date: "2026-07-29",
   changes: [
     {
       type: "New",
       items: [
-        "<strong>Search in Editor</strong>: Added search bar with visible highlights. Press Find button or Ctrl+F to search. Matches shown in pink, selected match in green.",
+        "<strong>Format on Save</strong>: Press Ctrl+S / Cmd+S to format the current code block.",
+        "<strong>Batch Format All</strong>: Press Ctrl+Shift+B to format all code blocks on the page at once.",
+        "<strong>Format Selection</strong>: Highlight code and format just that section.",
+        "<strong>Biome Formatter</strong>: Added Biome as an alternative formatter for JavaScript, TypeScript, JSON, and CSS (WASM-based).",
+        "<strong>Formatter Selector</strong>: Choose your preferred formatter (Prettier, js-beautify, or Biome) per language in Settings.",
+        "<strong>Print Formatted Code</strong>: New Print button in the toolbar to print formatted code with a clean layout.",
+        "<strong>Extension Icon</strong>: Click the extension icon to open Settings.",
+        "<strong>Dockerfile Support</strong>: Auto-detects and formats Dockerfiles.",
+        "<strong>Makefile Support</strong>: Auto-detects and formats Makefiles.",
+        "<strong>.env Support</strong>: Auto-detects .env files.",
+        "<strong>Context Menu</strong>: Right-click to select language for formatting (Dockerfile, Makefile, and more).",
       ],
     },
     {
       type: "Improved",
       items: [
-        "<strong>Architecture</strong>: Refactored codebase into modular structure for better maintainability.",
-        "<strong>Performance</strong>: Added lazy loading for themes and Prettier plugins. Large files (50k+ lines) are handled gracefully.",
+        "<strong>Language Detection</strong>: Enhanced auto-detection handles special filenames (Dockerfile, Makefile, .env, .eslintrc, .babelrc, .htaccess, .gitignore, docker-compose).",
+        "<strong>Theme Dropdown</strong>: All 10 editor themes now appear in the toolbar dropdown (was missing 6 themes).",
+        "<strong>Word Wrap</strong>: Word wrap toggle now works correctly. Setting persists and applies in real time.",
+        "<strong>Modular Architecture</strong>: Refactored into separate modules for editor, toolbar, status bar, detection, formatting, and search.",
+        "<strong>Test Coverage</strong>: Fixed pre-existing test failures. 104 tests passing.",
       ],
     },
     {
       type: "Fixed",
       items: [
-        "<strong>Search Highlights</strong>: Fixed search matches being invisible on some themes by using custom decorations.",
-        "<strong>Toolbar Icons</strong>: Fixed collapse/expand buttons not displaying.",
-      ],
-    },
-    {
-      type: "Removed",
-      items: [
-        "<strong>Word Wrap</strong>: Removed word wrap toggle from toolbar and status bar.",
+        "<strong>Duplicate Null Check</strong>: Removed redundant null check in background message handler.",
+        "<strong>Redundant parentElement</strong>: Fixed duplicate parentElement access in code block detection.",
+        "<strong>Wrap Status Display</strong>: Removed wrap status from status bar (was always showing 'off' regardless of setting).",
+        "<strong>Theme Dropdown</strong>: Fixed missing themes in the options page dropdown.",
+        "<strong>TypeScript Config</strong>: Restored missing tsconfig.json to unblock tests and type checking.",
       ],
     },
   ],

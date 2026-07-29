@@ -16,6 +16,7 @@ export interface FormatterSettings {
   indentTables?: boolean;
   autoFormatOnType?: boolean;
   formatOnPasteMinLength?: number;
+  preferredFormatter?: "prettier" | "js-beautify" | "biome";
 }
 
 export interface LanguageDefaults {

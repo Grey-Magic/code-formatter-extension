@@ -27,6 +27,8 @@ export interface ExtensionSettings {
   // Feature flags
   autoFormatOnType?: boolean;
   formatOnPasteMinLength?: number;
+  // Formatter selection
+  preferredFormatter?: "prettier" | "js-beautify" | "biome";
 }
 
 /** Available theme names */

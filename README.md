@@ -1,48 +1,107 @@
-# Code Formatter - JSON, CSS & JavaScript
+# Code Formatter Extension
 
+A browser extension that formats source code directly in the browser with syntax highlighting, line numbers, collapsible sections, and multiple formatter backends.
 
-## A Firefox extension that makes CSS, JSON, and JavaScript more readable in the browser with syntax highlighting, line numbers, and collapsible sections.
+Works on any webpage showing source code. Automatically detects and formats:
 
-You know how frustrating it is to read code that's not formatted correctly or is minified.
+- **Web**: JavaScript, TypeScript, JSX, TSX, CSS, SCSS, LESS, HTML, JSON
+- **Backend**: Python, Go, Rust, Java, C#, C++, PHP
+- **Data**: YAML, TOML, SQL, XML
+- **DevOps**: Dockerfile, Makefile, .env
 
-Works directly in your browser when viewing source code. Beyond basic highlighting, it automatically detects and enhances the following code types:
+## Features
 
-- JSON (json)
-- CSS (css)
-- JavaScript/TypeScript family (js, ts, jsx, tsx)
-- PHP (php)
-- Markdown (md)
-- XML (xml)
-- YAML (yaml, yml)
-- LESS (less)
-- SASS (sass)
-- Python (py)
-- SQL (sql)
-- Go (go)
-- C++ (cpp, cxx, cc)
-- Rust (rs)
-- Java (java)
-- C# (cs)
+### Formatting
 
-A treasure for developers and not only.
+- **Format on Save** — `Ctrl+S` / `Cmd+S` formats the current code
+- **Batch Format** — `Ctrl+Shift+B` formats all code blocks on the page
+- **Format Selection** — highlight code and format just that section
+- **Format on Paste** — auto-formats pasted code (configurable minimum length)
+- **Format on Type** — formats as you type with 500ms delay (optional)
 
-**Notable Features:**
+### Multiple Formatter Backends
 
-- Syntax highlighting for easy code understanding
-- Auto-beautifies code for better readability
-- One-click download or copy formatted code
-- Collapsible sections for focused viewing
-- Line numbers for easy reference
-- Auto-detects code on any webpage
-- Lightweight design that won't slow your browser
-- Is open-source and free to use
-- Fast - no waiting for code to format and instant results
+- **Prettier** — default formatter for web languages, Python
+- **js-beautify** — alternative formatter for web languages
+- **Biome** — fast formatter for JavaScript, TypeScript, JSON, CSS (WASM-based)
+- **Ruff** — Python formatter (WASM-based)
+- **Gofmt** — Go formatter (WASM-based)
+- **SQL Formatter** — SQL formatting (WASM-based)
+- **YAML Formatter** — YAML formatting (WASM-based)
+- **TOML Formatter** — TOML formatting (WASM-based)
+
+Choose your preferred formatter per language in Settings.
+
+### Editor
+
+- Syntax highlighting with 10 built-in themes (Monokai, Material, Dracula, Nord, GitHub Dark/Light, Solarized Dark/Light, Tokyo Night, One Dark Pro)
+- Line numbers
+- Collapsible code sections
+- Search in editor (`Ctrl+F`)
+- Word wrap toggle
+- Configurable font size and line height
+- Drag and drop file support
+
+### Toolbar
+
+- Open file button
+- Theme selector dropdown
+- Collapse/Expand all sections
+- Show original code toggle
+- Search bar
+- Batch format all blocks
+- Copy to clipboard
+- Download formatted file
+- Print formatted code
+
+### Language Detection
+
+- Auto-detects language from file extension
+- Special filename handling (Dockerfile, Makefile, .env, .eslintrc, .babelrc, etc.)
+- Context menu for manual language selection
+
+### Other
+
 - Works offline and online
-- Support for local files - just open a local file in the browser and see the code formatted
-- Supports multiple code types
+- Supports local files (`file://` URLs)
+- Lightweight and fast
+- Open source and free
+- No user data collected
+- Click extension icon to open Settings
 
+## Installation
 
-**Private and secure** - collects no user data.
+### Chrome
 
-### This project is modified from [awps/code-formatter-extension](https://github.com/awps/code-formatter-extension), originally created by zerowp
+1. Clone this repo
+2. Run `npm install && npm run build`
+3. Open `chrome://extensions`
+4. Enable "Developer mode"
+5. Click "Load unpacked" and select the project folder
 
+### Firefox
+
+1. Clone this repo
+2. Run `npm install && npm run build`
+3. Open `about:debugging#/runtime/this-firefox`
+4. Click "Load Temporary Add-on" and select `manifest.json`
+
+## Development
+
+| Command | Description |
+|---------|-------------|
+| `npm run build` | Full build (TypeScript + CSS) |
+| `npm run dev` | Watch mode |
+| `npm run test` | Run tests |
+| `npm run lint` | Lint TypeScript |
+
+## Permissions
+
+- `scripting` — inject content scripts for formatting
+- `tabs` — track active tab for context menus
+- `storage` — persist user settings
+- `contextMenus` — right-click format options
+
+## License
+
+MIT

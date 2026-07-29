@@ -30,6 +30,9 @@ export const LANGUAGES_BY_EXTENSION: Record<string, string> = {
   lua: "lua",
   zig: "zig",
   dart: "dart",
+  dockerfile: "dockerfile",
+  makefile: "makefile",
+  env: "dotenv",
 };
 
 export const EXTENSION_MAP = LANGUAGES_BY_EXTENSION;
@@ -54,6 +57,9 @@ export const EXTENSIONS_BY_LANGUAGE: Record<string, string> = {
   lua: "lua",
   zig: "zig",
   dart: "dart",
+  dockerfile: "Dockerfile",
+  makefile: "Makefile",
+  dotenv: "env",
 };
 
 export const ELEMENT_IDS = {
@@ -141,6 +147,7 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   commaPosition: "before",
   autoFormatOnType: false,
   formatOnPasteMinLength: 5,
+  preferredFormatter: "prettier",
 };
 
 export const LANGUAGE_DEFAULTS: Record<
@@ -160,6 +167,9 @@ export const LANGUAGE_DEFAULTS: Record<
   yaml: { indentSize: 2, useTabs: false, singleQuote: false, semi: true },
   toml: { indentSize: 2, useTabs: false, singleQuote: false, semi: true },
   markdown: { indentSize: 2, useTabs: false, singleQuote: false, semi: true },
+  dockerfile: { indentSize: 2, useTabs: false, singleQuote: false, semi: true },
+  makefile: { indentSize: 2, useTabs: true, singleQuote: false, semi: false },
+  dotenv: { indentSize: 2, useTabs: false, singleQuote: false, semi: false },
 };
 
 export const FORMATTABLE_LANGUAGES = new Set([
@@ -180,6 +190,9 @@ export const FORMATTABLE_LANGUAGES = new Set([
   "lua",
   "zig",
   "dart",
+  "dockerfile",
+  "makefile",
+  "dotenv",
 ]);
 
 export const CONTEXT_MENU_LANGUAGE_MAP: Record<string, string> = {
@@ -193,4 +206,6 @@ export const CONTEXT_MENU_LANGUAGE_MAP: Record<string, string> = {
   formatSQL: "sql",
   formatYAML: "yaml",
   formatTOML: "toml",
+  formatDockerfile: "dockerfile",
+  formatMakefile: "makefile",
 };

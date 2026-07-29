@@ -2,7 +2,7 @@ import { ELEMENT_IDS, CSS_CLASSES } from "../shared/constants";
 import { loadFiles } from "../formatters/file-loader";
 
 const ACCEPTED_FILE_EXTENSIONS =
-  ".js,.jsx,.ts,.tsx,.json,.css,.scss,.less,.html,.htm,.xml,.md,.py,.go,.rs,.sql,.yml,.yaml,.toml,.rb,.lua,.zig,.dart,.txt";
+  ".js,.jsx,.ts,.tsx,.json,.css,.scss,.less,.html,.htm,.xml,.md,.py,.go,.rs,.sql,.yml,.yaml,.toml,.rb,.lua,.zig,.dart,.txt,.Dockerfile,.dockerfile";
 
 let fileInputElement: HTMLInputElement | null = null;
 let dropZoneElement: HTMLElement | null = null;
