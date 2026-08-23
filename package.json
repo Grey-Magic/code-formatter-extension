@@ -1,6 +1,6 @@
 {
   "name": "code-formatter-extension",
-  "version": "1.9.6",
+  "version": "1.9.7",
   "description": "Code Formatter - Format and beautify code in your browser",
   "scripts": {
     "build": "node config/esbuild.config.js && npm run build:css",
