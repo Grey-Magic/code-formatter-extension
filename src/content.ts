@@ -5,7 +5,7 @@ import {
   DEFAULT_SETTINGS,
   FORMATTABLE_LANGUAGES,
 } from "./shared/constants";
-import { LRUMap, debounce } from "./shared/utils";
+import { LRUMap, debounce, isSiteIgnored } from "./shared/utils";
 import { detectLanguage, appearsToBeCodePage } from "./content/detection";
 import { showToast } from "./content/toast";
 import {
@@ -23,6 +23,7 @@ import {
   setEditorInstance,
   setCurrentLanguage,
   downloadCode,
+  syncMinifyButton,
 } from "./content/toolbar";
 import { createStatusBar, updateStatusBarWithFile } from "./content/status-bar";
 import {
@@ -107,9 +108,17 @@ function loadSettings(): Promise<void> {
         "commaPosition",
         "autoFormatOnType",
         "formatOnPasteMinLength",
+        "minify",
+        "ignoredSites",
       ],
       (result: Partial<ExtensionSettings>) => {
         Object.assign(currentSettings, result);
+        if (Array.isArray(result.ignoredSites)) {
+          (currentSettings as ExtensionSettings).ignoredSites = result.ignoredSites;
+        }
+        if (typeof result.minify === "boolean") {
+          (currentSettings as ExtensionSettings).minify = result.minify;
+        }
         resolve();
       },
     );
@@ -128,12 +137,28 @@ function saveSettings(): void {
 }
 
 function simpleHash(str: string): string {
+  const SAMPLE_END = 8192;
+  const TAIL_LEN = 2048;
   let hash = 0;
-  for (let i = 0; i < str.length; i++) {
+
+  const end = str.length < SAMPLE_END ? str.length : SAMPLE_END;
+  for (let i = 0; i < end; i++) {
     const char = str.charCodeAt(i);
     hash = (hash << 5) - hash + char;
     hash = hash & hash;
   }
+
+  if (str.length > SAMPLE_END) {
+    const start = str.length - TAIL_LEN;
+    for (let i = start; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash;
+    }
+    hash = (hash << 5) - hash + str.length;
+    hash = hash & hash;
+  }
+
   return hash.toString(36);
 }
 
@@ -225,7 +250,39 @@ function showLoadingSkeleton(): HTMLElement {
 
 function extractOriginalCode(): string {
   const pre = document.querySelector("body > pre");
-  return pre?.textContent || document.body.innerText;
+  if (pre?.textContent) return pre.textContent;
+  // Fall back to the cheaper textContent (no forced layout/reflow) instead
+  // of innerText, which would invoke expensive layout calculations on huge
+  // pages and degrades the host page's main thread.
+  return document.body.textContent || "";
+}
+
+async function reformatCurrentEditor(): Promise<void> {
+  if (!currentEditorCode || !currentEditorLanguage) return;
+  const formatted = await formatCode(currentEditorCode, currentEditorLanguage);
+  const editor = getEditor();
+  if (editor && formatted !== currentEditorCode) {
+    editor.dispatch({
+      changes: {
+        from: 0,
+        to: editor.state.doc.length,
+        insert: formatted,
+      },
+    });
+    currentEditorCode = formatted;
+  }
+}
+
+async function toggleMinify(): Promise<void> {
+  currentSettings.minify = !currentSettings.minify;
+  saveSettings();
+  syncMinifyButton();
+  await reformatCurrentEditor();
+  showToast(
+    currentSettings.minify ? "Minified" : "Formatted",
+    "info",
+    1500,
+  );
 }
 
 async function autoFormatPage(): Promise<void> {
@@ -280,6 +337,7 @@ async function autoFormatPage(): Promise<void> {
       getCode: () => currentEditorCode,
       onDownload: downloadCode,
       batchFormat: batchFormatAllBlocks,
+      toggleMinify,
     });
 
     const toolbar = createToolbar();
@@ -318,7 +376,7 @@ async function autoFormatPage(): Promise<void> {
 function setupMessageListener(): void {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.action === "getLanguage") {
-      const content = document.body.innerText || "";
+      const content = document.body.textContent || "";
       const limitedContent =
         content.length > 50000 ? content.substring(0, 50000) : content;
       const lang = detectLanguage(limitedContent);
@@ -425,23 +483,7 @@ function setupKeyboardShortcuts(): void {
 
     if (keyEvent.ctrlKey && keyEvent.shiftKey && keyEvent.key === "F") {
       keyEvent.preventDefault();
-      if (currentEditorCode && currentEditorLanguage) {
-        formatCode(currentEditorCode, currentEditorLanguage).then(
-          (formatted) => {
-            const editor = getEditor();
-            if (editor && formatted !== currentEditorCode) {
-              editor.dispatch({
-                changes: {
-                  from: 0,
-                  to: editor.state.doc.length,
-                  insert: formatted,
-                },
-              });
-              currentEditorCode = formatted;
-            }
-          },
-        );
-      }
+      reformatCurrentEditor();
     }
 
     if ((keyEvent.ctrlKey || keyEvent.metaKey) && keyEvent.key === "o") {
@@ -451,28 +493,17 @@ function setupKeyboardShortcuts(): void {
 
     if ((keyEvent.ctrlKey || keyEvent.metaKey) && keyEvent.key === "s") {
       keyEvent.preventDefault();
-      if (currentEditorCode && currentEditorLanguage) {
-        formatCode(currentEditorCode, currentEditorLanguage).then(
-          (formatted) => {
-            const editor = getEditor();
-            if (editor && formatted !== currentEditorCode) {
-              editor.dispatch({
-                changes: {
-                  from: 0,
-                  to: editor.state.doc.length,
-                  insert: formatted,
-                },
-              });
-              currentEditorCode = formatted;
-            }
-          },
-        );
-      }
+      reformatCurrentEditor();
     }
 
     if (keyEvent.ctrlKey && keyEvent.shiftKey && keyEvent.key === "B") {
       keyEvent.preventDefault();
       batchFormatAllBlocks();
+    }
+
+    if (keyEvent.ctrlKey && keyEvent.shiftKey && keyEvent.key === "M") {
+      keyEvent.preventDefault();
+      void toggleMinify();
     }
   });
 }
@@ -504,24 +535,40 @@ async function batchFormatAllBlocks(): Promise<void> {
 
   let successCount = 0;
   let errorCount = 0;
+  const CONCURRENCY = 4;
 
-  for (const pre of preElements) {
+  // Snapshot jobs up front and run with a small worker pool so that big
+  // pages make use of parallelism while still bounding in-flight requests.
+  const jobs: { el: HTMLPreElement; code: string; lang: string }[] = [];
+  for (const pre of Array.from(preElements)) {
     const code = pre.textContent || "";
     if (!code.trim()) continue;
-
     const lang = detectLanguage(code);
     if (!lang) continue;
-
-    try {
-      const formatted = await formatCode(code, lang);
-      if (formatted !== code) {
-        pre.textContent = formatted;
-        successCount++;
-      }
-    } catch {
-      errorCount++;
-    }
+    jobs.push({ el: pre as HTMLPreElement, code, lang });
   }
+
+  let cursor = 0;
+  const worker = async (): Promise<void> => {
+    while (cursor < jobs.length) {
+      const idx = cursor++;
+      const job = jobs[idx];
+      try {
+        const formatted = await formatCode(job.code, job.lang);
+        if (formatted !== job.code) {
+          job.el.textContent = formatted;
+          successCount++;
+        }
+      } catch {
+        errorCount++;
+      }
+    }
+  };
+  const pool = Array.from(
+    { length: Math.min(CONCURRENCY, Math.max(jobs.length, 1)) },
+    () => worker(),
+  );
+  await Promise.all(pool);
 
   showToast(
     `Batch format complete: ${successCount} formatted, ${errorCount} errors`,
@@ -533,6 +580,13 @@ async function main(): Promise<void> {
   await loadSettings();
 
   const init = async () => {
+    if (isSiteIgnored(location.hostname, currentSettings.ignoredSites ?? [])) {
+      console.log(
+        "[Code Formatter] Skipping initialization for ignored site:",
+        location.hostname,
+      );
+      return;
+    }
     if (appearsToBeCodePage()) {
       await autoFormatPage();
     }

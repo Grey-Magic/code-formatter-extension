@@ -19,12 +19,13 @@ import { python } from "@codemirror/lang-python";
 import { sql } from "@codemirror/lang-sql";
 import { markdown } from "@codemirror/lang-markdown";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { COLORS } from "../shared/constants";
-import { PERFORMANCE_THRESHOLDS } from "../shared/constants";
+import { COLORS, PERFORMANCE_THRESHOLDS } from "../shared/constants";
+import { countNewlines } from "../shared/utils";
 import { getSearchHighlightExtension } from "./search-highlight";
+import { createLintExtension } from "./lint";
 import type { ExtensionSettings, ThemeName } from "../shared/types";
 
-const DARK_THEMES: ThemeName[] = [
+const DARK_THEMES: ReadonlySet<ThemeName> = new Set([
   "one-dark-pro",
   "dracula",
   "nord",
@@ -33,7 +34,30 @@ const DARK_THEMES: ThemeName[] = [
   "github-dark",
   "solarized-dark",
   "tokyo-night",
-];
+]);
+
+/** Theme used when the user selects "auto" on a light system */
+const AUTO_LIGHT_THEME: ThemeName = "github-light";
+/** Theme used when the user selects "auto" on a dark system */
+const AUTO_DARK_THEME: ThemeName = "one-dark-pro";
+
+let autoThemeQuery: MediaQueryList | null = null;
+let autoThemeListener: (() => void) | null = null;
+
+/**
+ * Resolve a configured theme to a concrete one. The special "auto" value
+ * follows the OS prefers-color-scheme setting.
+ */
+export function resolveThemeName(theme: ThemeName): ThemeName {
+  if (theme !== "auto") return theme;
+  try {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? AUTO_DARK_THEME
+      : AUTO_LIGHT_THEME;
+  } catch {
+    return AUTO_DARK_THEME;
+  }
+}
 
 const themeCompartment = new Compartment();
 const languageCompartment = new Compartment();
@@ -99,10 +123,27 @@ async function loadTheme(theme: ThemeName): Promise<Extension> {
 export function initEditor(settings: ExtensionSettings): void {
   currentSettings = settings;
   updateThemeAttribute();
+
+  // Live-switch when the OS theme flips while "auto" is selected
+  try {
+    if (!autoThemeQuery) {
+      autoThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    }
+    if (autoThemeQuery && !autoThemeListener) {
+      autoThemeListener = () => {
+        if (currentSettings?.theme === "auto") {
+          void applyTheme();
+        }
+      };
+      autoThemeQuery.addEventListener("change", autoThemeListener);
+    }
+  } catch {
+    // matchMedia unavailable; static theme fallback applies
+  }
 }
 
 function updateThemeAttribute(): void {
-  const isDark = DARK_THEMES.includes(currentSettings.theme);
+  const isDark = DARK_THEMES.has(resolveThemeName(currentSettings.theme));
   document.documentElement.setAttribute(
     "data-theme",
     isDark ? "dark" : "light",
@@ -117,47 +158,56 @@ export function setEditor(editor: EditorView | null): void {
   editorInstance = editor;
 }
 
-export function getThemeCompartment(): Compartment {
-  return themeCompartment;
-}
-
-export function getLanguageCompartment(): Compartment {
-  return languageCompartment;
-}
+const languageExtCache = new Map<string, Extension>();
 
 function getLanguageExtension(language: string): Extension {
   const lang = language.toLowerCase();
+  const cached = languageExtCache.get(lang);
+  if (cached) return cached;
+
+  let ext: Extension;
   switch (lang) {
     case "javascript":
     case "typescript":
     case "jsx":
     case "tsx":
-      return javascript();
+      ext = javascript();
+      break;
     case "json":
-      return json();
+      ext = json();
+      break;
     case "css":
     case "scss":
     case "less":
-      return css();
+      ext = css();
+      break;
     case "html":
     case "xml":
     case "svg":
-      return html();
+      ext = html();
+      break;
     case "python":
     case "py":
-      return python();
+      ext = python();
+      break;
     case "sql":
-      return sql();
+      ext = sql();
+      break;
     case "markdown":
     case "md":
-      return markdown();
+      ext = markdown();
+      break;
     default:
-      return [];
+      ext = [];
+      break;
   }
+
+  languageExtCache.set(lang, ext);
+  return ext;
 }
 
 function getBaseThemeExtensions(): Extension[] {
-  const isDark = DARK_THEMES.includes(currentSettings.theme);
+  const isDark = DARK_THEMES.has(resolveThemeName(currentSettings.theme));
   const bg = isDark ? COLORS.EDITOR_BG_DARK : COLORS.EDITOR_BG_LIGHT;
   const fg = isDark ? COLORS.EDITOR_FG_DARK : COLORS.EDITOR_FG_LIGHT;
   const gutterBg = isDark ? COLORS.GUTTER_BG_DARK : COLORS.GUTTER_BG_LIGHT;
@@ -196,12 +246,13 @@ function getBaseThemeExtensions(): Extension[] {
 
 async function getThemeExtensions(): Promise<Extension[]> {
   const exts: Extension[] = [];
+  const resolvedTheme = resolveThemeName(currentSettings.theme);
 
-  if (currentSettings.theme === "one-dark-pro") {
+  if (resolvedTheme === "one-dark-pro") {
     exts.push(oneDark);
-  } else if (currentSettings.theme) {
+  } else if (resolvedTheme) {
     try {
-      const theme = await loadTheme(currentSettings.theme);
+      const theme = await loadTheme(resolvedTheme);
       exts.push(theme);
     } catch {
       exts.push(syntaxHighlighting(defaultHighlightStyle));
@@ -225,7 +276,7 @@ export async function createEditor(
   const isEditable = currentSettings.autoFormatOnType ?? false;
   const themeExts = await getThemeExtensions();
 
-  const lineCount = code.split("\n").length;
+  const lineCount = countNewlines(code);
   const isLargeFile = lineCount > PERFORMANCE_THRESHOLDS.LARGE_FILE_LINES;
   const isHugeFile = lineCount > PERFORMANCE_THRESHOLDS.HUGE_FILE_LINES;
 
@@ -237,7 +288,7 @@ export async function createEditor(
 
   const extensions: Extension[] = [
     lineNumbers(),
-    isHugeFile ? bracketMatching() : bracketMatching(),
+    !isHugeFile ? bracketMatching() : null,
     !isHugeFile ? codeFolding() : null,
     !isHugeFile ? foldGutter() : null,
     indentOnInput(),
@@ -253,6 +304,7 @@ export async function createEditor(
     themeCompartment.of(themeExts),
     wrapCompartment.of(currentSettings.wrapLines ? EditorView.lineWrapping : []),
     EditorView.editable.of(isEditable && !isHugeFile),
+    ...(!isHugeFile ? createLintExtension(language) : []),
   ].filter(Boolean) as Extension[];
 
   if (isEditable && onUpdate && !isHugeFile) {
@@ -323,6 +375,15 @@ export function destroyEditor(): void {
   if (editorInstance) {
     editorInstance.destroy();
     editorInstance = null;
+  }
+
+  if (autoThemeQuery && autoThemeListener) {
+    try {
+      autoThemeQuery.removeEventListener("change", autoThemeListener);
+    } catch {
+      // ignore
+    }
+    autoThemeListener = null;
   }
 }
 

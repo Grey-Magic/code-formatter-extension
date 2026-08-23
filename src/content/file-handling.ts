@@ -96,7 +96,7 @@ function createDropZone(): HTMLElement {
   zone.id = ELEMENT_IDS.DROP_ZONE;
   zone.className = CSS_CLASSES.DROP_ZONE;
   const content = document.createElement("div");
-  content.className = "code-formatter-drop-zone__content";
+  content.className = CSS_CLASSES.DROP_ZONE_CONTENT;
 
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("width", "64");
@@ -139,7 +139,7 @@ function createDropZone(): HTMLElement {
   svg.appendChild(createLine("15", "15", "12", "12"));
 
   const text = document.createElement("p");
-  text.className = "code-formatter-drop-zone__text";
+  text.className = CSS_CLASSES.DROP_ZONE_TEXT;
   text.textContent = "Drop files here or press ";
 
   const kbd = document.createElement("kbd");

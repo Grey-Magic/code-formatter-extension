@@ -16,29 +16,6 @@ interface WasmModule {
 const wasmCache = new Map<string, WasmModule>();
 const wasmLoadPromises = new Map<string, Promise<WasmModule>>();
 
-// Maximum number of errors to keep
-const MAX_ERRORS = 10;
-
-// Error tracking for monitoring
-interface WasmLoadError {
-  timestamp: number;
-  module: string;
-  error: string;
-}
-
-const loadErrors: WasmLoadError[] = [];
-
-/**
- * Add an error to the error log, maintaining max size
- */
-function addError(error: WasmLoadError): void {
-  loadErrors.push(error);
-  // Keep only the most recent errors
-  while (loadErrors.length > MAX_ERRORS) {
-    loadErrors.shift();
-  }
-}
-
 /**
  * Get the base URL for WASM files in the extension
  */
@@ -61,20 +38,6 @@ export function isWasmSupported(): boolean {
   } catch {
     return false;
   }
-}
-
-/**
- * Get recent load errors for debugging
- */
-export function getRecentErrors(): WasmLoadError[] {
-  return loadErrors.slice(-10); // Return last 10 errors
-}
-
-/**
- * Clear error history
- */
-export function clearErrorHistory(): void {
-  loadErrors.length = 0;
 }
 
 /**
@@ -101,11 +64,6 @@ export async function loadWasmFormatter(
   const loadPromise = (async () => {
     if (!isWasmSupported()) {
       const error = new Error("WebAssembly is not supported in this browser");
-      addError({
-        timestamp: Date.now(),
-        module: webJsFile,
-        error: error.message,
-      });
       console.warn("[WASM Loader] WebAssembly not supported:", webJsFile);
       throw error;
     }
@@ -141,11 +99,6 @@ export async function loadWasmFormatter(
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      addError({
-        timestamp: Date.now(),
-        module: webJsFile,
-        error: errorMessage,
-      });
 
       console.error(`[WASM Loader] Failed to load ${webJsFile}:`, error);
       throw new Error(
@@ -164,35 +117,9 @@ export async function loadWasmFormatter(
 }
 
 /**
- * Try to load WASM formatter with graceful fallback
- * Returns null instead of throwing on failure
- */
-export async function tryLoadWasmFormatter(
-  webJsFile: string,
-  wasmFile: string,
-): Promise<WasmModule | null> {
-  try {
-    return await loadWasmFormatter(webJsFile, wasmFile);
-  } catch (error) {
-    console.warn(`[WASM Loader] Graceful fallback for ${webJsFile}:`, error);
-    return null;
-  }
-}
-
-/**
  * Clear the WASM module cache
  */
 export function clearWasmCache(): void {
   wasmCache.clear();
   console.log("[WASM Loader] Cache cleared");
-}
-
-/**
- * Get cache statistics
- */
-export function getCacheStats(): { size: number; modules: string[] } {
-  return {
-    size: wasmCache.size,
-    modules: Array.from(wasmCache.keys()),
-  };
 }

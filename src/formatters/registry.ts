@@ -3,6 +3,7 @@ import { normalizeLanguage } from "./types";
 import { PrettierFormatter } from "./prettier-formatter";
 import { JsBeautifyFormatter } from "./js-beautify-formatter";
 import { FallbackFormatter } from "./fallback-formatter";
+import { MinifyFormatter } from "./minify";
 import {
   RuffFormatter,
   GofmtFormatter,
@@ -13,13 +14,17 @@ import {
 } from "./wasm-formatters";
 
 /**
- * Registry that manages all available formatters
- * Uses a strategy pattern to route formatting requests to the appropriate formatter
+ * Registry that manages all available formatters.
+ * Uses a strategy pattern to route formatting requests to the appropriate formatter.
+ * Instantiated once below as the module-level singleton; not exported so all
+ * formatting goes through `formatterRegistry`.
  */
-export class FormatterRegistry {
+class FormatterRegistry {
   private formatters: Map<string, IFormatter> = new Map();
   private languageMap: Map<string, string> = new Map();
   private languageFormatters: Map<string, string[]> = new Map();
+  /** Held separately so minify never becomes a language's default formatter */
+  private readonly minifyFormatter = new MinifyFormatter();
 
   constructor() {
     this.registerDefaultFormatters();
@@ -101,13 +106,19 @@ export class FormatterRegistry {
   }
 
   /**
-   * Format code using the appropriate formatter
+   * Format code using the appropriate formatter.
+   * Routes to the minifier when settings.minify is enabled and the language
+   * is minifiable; otherwise uses the normal strategy lookup.
    */
   async format(
     code: string,
     language: string,
     settings?: FormatterSettings,
   ): Promise<FormatResult> {
+    if (settings?.minify && this.minifyFormatter.supports(language)) {
+      return this.minifyFormatter.format(code, language, settings);
+    }
+
     const formatter = this.getFormatter(language, settings?.preferredFormatter);
 
     if (!formatter) {

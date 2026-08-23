@@ -489,6 +489,14 @@
             </div>
 
             <div class="checkbox-group">
+              <input type="checkbox" class="checkbox" id="use-tabs" />
+              <label class="checkbox-label" for="use-tabs">
+                Use tabs instead of spaces
+                <small>(auto-detected per language if unchecked)</small>
+              </label>
+            </div>
+
+            <div class="checkbox-group">
               <input type="checkbox" class="checkbox" id="semi" />
               <label class="checkbox-label" for="semi">
                 Add semicolons
@@ -521,6 +529,7 @@
                 <small>(syntax highlighting)</small>
               </label>
               <select class="form-control form-select" id="theme">
+                <option value="auto">Auto (system)</option>
                 <option value="one-dark-pro">One Dark Pro</option>
                 <option value="dracula">Dracula</option>
                 <option value="nord">Nord</option>
@@ -595,6 +604,14 @@
               </label>
             </div>
 
+            <div class="checkbox-group">
+              <input type="checkbox" class="checkbox" id="minify-mode" />
+              <label class="checkbox-label" for="minify-mode">
+                Minify by default
+                <small>(compresses output instead of beautifying)</small>
+              </label>
+            </div>
+
             <div class="form-group">
               <label class="form-label" for="format-on-paste-min-length">
                 Format on paste minimum length
@@ -608,6 +625,28 @@
                 max="50"
                 value="5"
               />
+            </div>
+          </div>
+
+          <!-- Site Settings -->
+          <div class="settings-card">
+            <div class="card-header">
+              <i class="fas fa-globe card-icon"></i>
+              <h2 class="card-title">Site Settings</h2>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="ignored-sites">
+                Ignored sites
+                <small>(one hostname per line, "*.example.com" matches all subdomains)</small>
+              </label>
+              <textarea
+                class="form-control"
+                id="ignored-sites"
+                rows="4"
+                placeholder="example.com&#10;*.docs.example.com"
+                style="font-family: monospace; resize: vertical;"
+              ></textarea>
             </div>
           </div>
 

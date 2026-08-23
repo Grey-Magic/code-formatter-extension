@@ -18,13 +18,13 @@ import type {
   GetSupportedLanguagesResponse,
   CheckLanguageSupportResponse,
 } from "./shared/types";
+import { LRUMap } from "./shared/utils";
 import {
   LANGUAGE_DEFAULTS,
   CONTEXT_MENU_LANGUAGE_MAP,
 } from "./shared/constants";
 
-const formatCache = new Map<string, string>();
-const MAX_CACHE_SIZE = 50;
+const formatCache = new LRUMap<string, string>(50);
 
 const MAX_CODE_SIZE = 1024 * 1024;
 
@@ -37,6 +37,10 @@ const rateLimitMap = new Map<number, RateLimitEntry>();
 const RATE_LIMIT_WINDOW = 1000;
 const RATE_LIMIT_MAX = 10;
 
+chrome.tabs.onRemoved.addListener((tabId) => {
+  rateLimitMap.delete(tabId);
+});
+
 /**
  * Validates the sender of a message to prevent unauthorized access
  * Only accepts messages from the extension's own pages or content scripts
@@ -45,25 +49,14 @@ function validateSender(sender: chrome.runtime.MessageSender): {
   valid: boolean;
   error?: string;
 } {
-  // Allow messages with no sender (internal extension calls)
   if (!sender.id || sender.id === chrome.runtime.id) {
     return { valid: true };
   }
 
-  // Allow messages from content scripts (they have url property)
   if (sender.url) {
-    try {
-      // Validate that the URL is parseable
-      new URL(sender.url);
-      // Allow messages from any tab - content scripts are trusted
-      // The manifest only allows content scripts on specific patterns
-      return { valid: true };
-    } catch {
-      return { valid: false, error: "Invalid sender URL" };
-    }
+    return { valid: true };
   }
 
-  // If no URL and not from extension, reject
   return { valid: false, error: "Unknown message sender" };
 }
 
@@ -136,39 +129,40 @@ function validateFormatMessage(msg: unknown): string | null {
     if (typeof formatMsg.settings !== "object") {
       return 'Parameter "settings" must be an object';
     }
-    // Check for circular references by trying to stringify
-    try {
-      JSON.stringify(formatMsg.settings);
-    } catch {
-      return 'Parameter "settings" contains invalid data (possible circular reference)';
-    }
   }
 
-  return null; // Valid
+  return null;
 }
 
 /**
- * Generate a secure cache key using SHA-256 hash
- * Uses Web Crypto API for cryptographic hashing to prevent collisions
+ * Generate a synchronous cache key using djb2 hash
  */
-async function hashKey(
+function hashKey(
   code: string,
   language: string,
   settings?: FormatterSettings,
-): Promise<string> {
+): string {
   const settingsStr = JSON.stringify(settings ?? {});
   const str = `${language}:${settingsStr}:${code}`;
 
-  // Use Web Crypto API for secure hashing
-  const encoder = new TextEncoder();
-  const data = encoder.encode(str);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  const SAMPLE_END = 8192;
+  const TAIL_LEN = 2048;
+  let hash = 5381;
 
-  return hashHex;
+  const end = str.length < SAMPLE_END ? str.length : SAMPLE_END;
+  for (let i = 0; i < end; i++) {
+    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
+  }
+
+  if (str.length > SAMPLE_END) {
+    const start = str.length - TAIL_LEN;
+    for (let i = start; i < str.length; i++) {
+      hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
+    }
+    hash = ((hash << 5) + hash + str.length) | 0;
+  }
+
+  return hash.toString(36);
 }
 
 /**
@@ -195,6 +189,7 @@ function convertSettings(
     singleQuote: settings?.singleQuote ?? langDefaults?.singleQuote ?? true,
     semi: settings?.semi ?? langDefaults?.semi ?? true,
     trailingComma: settings?.trailingComma ?? "es5",
+    minify: settings?.minify ?? false,
     preferredFormatter:
       (settings?.preferredFormatter as
         | "prettier"
@@ -240,7 +235,7 @@ async function formatCode(
   }
 
   const formatterSettings = convertSettings(settings, language);
-  const key = await hashKey(code, language, formatterSettings);
+  const key = hashKey(code, language, formatterSettings);
   const cached = formatCache.get(key);
   if (cached) {
     return { success: true, code: cached };
@@ -253,14 +248,7 @@ async function formatCode(
     );
 
     if (result.success) {
-      while (formatCache.size >= MAX_CACHE_SIZE && formatCache.size > 0) {
-        const firstKey = formatCache.keys().next().value;
-        if (firstKey === undefined) break;
-        formatCache.delete(firstKey);
-      }
-      if (formatCache.size < MAX_CACHE_SIZE) {
-        formatCache.set(key, result.code);
-      }
+      formatCache.set(key, result.code);
     }
 
     return result;
@@ -468,9 +456,45 @@ function setupContextMenu(): void {
       title: "Format as Makefile",
       contexts: ["selection"],
     });
+    chrome.contextMenus.create({
+      id: "ignoreThisSite",
+      title: "Code Formatter: Ignore this site",
+      contexts: ["page"],
+    });
   });
 
   chrome.contextMenus.onClicked.addListener((info, tab) => {
+    // Page-context action: add the current host to the user's ignore list
+    // and reload the tab so the change takes effect immediately.
+    if (info.menuItemId === "ignoreThisSite") {
+      if (!tab?.id || !info.pageUrl) return;
+      let host = "";
+      try {
+        host = new URL(info.pageUrl).hostname.toLowerCase();
+      } catch {
+        return;
+      }
+      if (!host) return;
+      chrome.storage.sync.get(["ignoredSites"], (result) => {
+        const existing = Array.isArray(result.ignoredSites)
+          ? result.ignoredSites
+          : [];
+        if (!existing.includes(host)) {
+          chrome.storage.sync.set(
+            { ignoredSites: [...existing, host] },
+            () => {
+              if (tab.id !== undefined) {
+                chrome.tabs.reload(tab.id);
+              }
+            },
+          );
+        } else if (tab.id !== undefined) {
+          chrome.tabs.reload(tab.id);
+        }
+      });
+      return;
+    }
+
     if (!tab?.id || !info.selectionText) return;
 
     if (info.selectionText.length > MAX_CODE_SIZE) {

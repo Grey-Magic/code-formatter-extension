@@ -1,5 +1,16 @@
 import { LANGUAGES_BY_EXTENSION } from "./constants";
 
+const CODE_EXTENSION_LIST = Object.keys(LANGUAGES_BY_EXTENSION).join("|");
+export const CODE_EXTENSIONS_RE = new RegExp(`\\.(${CODE_EXTENSION_LIST})$`, "i");
+
+export function countNewlines(s: string): number {
+  let n = 0;
+  for (let i = 0; i < s.length; i++) {
+    if (s.charCodeAt(i) === 10) n++;
+  }
+  return n + (s.length > 0 && s.charCodeAt(s.length - 1) !== 10 ? 1 : 0);
+}
+
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number,
@@ -17,23 +28,6 @@ export function debounce<T extends (...args: any[]) => any>(
     }
 
     timeout = setTimeout(later, wait);
-  };
-}
-
-export function throttle<T extends (...args: any[]) => any>(
-  func: T,
-  limit: number,
-): (...args: Parameters<T>) => void {
-  let inThrottle = false;
-
-  return function (...args: Parameters<T>): void {
-    if (!inThrottle) {
-      func(...args);
-      inThrottle = true;
-      setTimeout(() => {
-        inThrottle = false;
-      }, limit);
-    }
   };
 }
 
@@ -83,12 +77,24 @@ export class LRUMap<K, V> {
   }
 }
 
+const CODE_EXTENSIONS =
+  /\.(js|jsx|ts|tsx|mjs|cjs|json|py|pyi|go|rs|sql|html|htm|xml|css|scss|less|md|yml|yaml|toml|rb|lua|zig|dart)$/i;
+
+const SPECIAL_FILENAMES: Record<string, string> = {
+  dockerfile: "dockerfile",
+  makefile: "makefile",
+  "docker-compose": "yaml",
+  ".eslintrc": "json",
+  ".prettierrc": "json",
+  ".babelrc": "json",
+  ".htaccess": "apache",
+  ".env": "dotenv",
+  ".gitignore": "gitignore",
+};
+
 export function detectLanguageFromUrl(): string | null {
   const url = window.location.href;
-
-  const codeExtensions =
-    /\.(js|jsx|ts|tsx|mjs|cjs|json|py|pyi|go|rs|sql|html|htm|xml|css|scss|less|md|yml|yaml|toml|rb|lua|zig|dart)$/i;
-  const match = url.match(codeExtensions);
+  const match = url.match(CODE_EXTENSIONS);
 
   if (match) {
     const ext = match[1].toLowerCase();
@@ -106,8 +112,6 @@ export function formatFileSize(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-export { LANGUAGES_BY_EXTENSION as EXTENSION_TO_LANGUAGE_MAP };
-
 export function getLanguageFromFilename(filename: string): string | null {
   if (!filename || typeof filename !== "string") {
     return null;
@@ -115,22 +119,9 @@ export function getLanguageFromFilename(filename: string): string | null {
 
   const baseName = filename.split("/").pop() || filename;
 
-  // Handle special filenames without extensions
-  const specialFilenames: Record<string, string> = {
-    dockerfile: "dockerfile",
-    makefile: "makefile",
-    "docker-compose": "yaml",
-    ".eslintrc": "json",
-    ".prettierrc": "json",
-    ".babelrc": "json",
-    ".htaccess": "apache",
-    ".env": "dotenv",
-    ".gitignore": "gitignore",
-  };
-
   const lowerBase = baseName.toLowerCase();
-  if (specialFilenames[lowerBase]) {
-    return specialFilenames[lowerBase];
+  if (SPECIAL_FILENAMES[lowerBase]) {
+    return SPECIAL_FILENAMES[lowerBase];
   }
 
   // Handle Dockerfile.* variants (e.g., Dockerfile.prod, Dockerfile.staging)
@@ -164,4 +155,48 @@ export function getLanguageFromFilename(filename: string): string | null {
   }
 
   return LANGUAGES_BY_EXTENSION[ext] || null;
+}
+
+/**
+ * Normalize a user-entered ignore pattern: lowercase, trimmed, no scheme,
+ * path or trailing slash. Returns null for empty/invalid input.
+ */
+export function normalizeSitePattern(pattern: string): string | null {
+  let p = (pattern || "").trim().toLowerCase();
+  if (!p) return null;
+
+  // Strip scheme and leading slashes from pasted URLs
+  p = p.replace(/^https?:\/\//, "").replace(/^\/+/, "");
+  // Keep only the host portion (drop path/query/hash)
+  const hostEnd = /[/?#]/.exec(p);
+  if (hostEnd) p = p.slice(0, hostEnd.index);
+  if (p.endsWith("/")) p = p.slice(0, -1);
+
+  return p || null;
+}
+
+/**
+ * Check whether a hostname matches any ignore pattern.
+ * Patterns are hosts, optionally with a "*." wildcard prefix matching
+ * subdomains at any depth. Exact matches and parent-domain wildcards win;
+ * a bare domain pattern does NOT match its subdomains unless wildcarded.
+ */
+export function isSiteIgnored(hostname: string, patterns: string[]): boolean {
+  if (!hostname || !patterns?.length) return false;
+
+  const host = hostname.trim().toLowerCase();
+
+  return patterns.some((raw) => {
+    const pattern = normalizeSitePattern(raw);
+    if (!pattern) return false;
+
+    if (pattern.startsWith("*.")) {
+      const base = pattern.slice(2);
+      return (
+        base !== "" &&
+        (host === base || (host.endsWith("." + base) && host !== base))
+      );
+    }
+    return host === pattern;
+  });
 }

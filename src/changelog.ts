@@ -40,43 +40,32 @@ interface ChangelogData {
  * The changelog data containing version information and categorized changes
  */
 const changelogData: ChangelogData = {
-  version: "1.9.6",
-  date: "2026-07-29",
+  version: "1.9.7",
+  date: "2026-08-23",
   changes: [
     {
       type: "New",
       items: [
-        "<strong>Format on Save</strong>: Press Ctrl+S / Cmd+S to format the current code block.",
-        "<strong>Batch Format All</strong>: Press Ctrl+Shift+B to format all code blocks on the page at once.",
-        "<strong>Format Selection</strong>: Highlight code and format just that section.",
-        "<strong>Biome Formatter</strong>: Added Biome as an alternative formatter for JavaScript, TypeScript, JSON, and CSS (WASM-based).",
-        "<strong>Formatter Selector</strong>: Choose your preferred formatter (Prettier, js-beautify, or Biome) per language in Settings.",
-        "<strong>Print Formatted Code</strong>: New Print button in the toolbar to print formatted code with a clean layout.",
-        "<strong>Extension Icon</strong>: Click the extension icon to open Settings.",
-        "<strong>Dockerfile Support</strong>: Auto-detects and formats Dockerfiles.",
-        "<strong>Makefile Support</strong>: Auto-detects and formats Makefiles.",
-        "<strong>.env Support</strong>: Auto-detects .env files.",
-        "<strong>Context Menu</strong>: Right-click to select language for formatting (Dockerfile, Makefile, and more).",
+        "<strong>Use Tabs Option</strong>: New toggle in Settings to use tabs instead of spaces.",
+        "<strong>More Languages</strong>: Right-click menu now supports 28 languages including Rust, Ruby, PHP, Java, Swift, Kotlin, and more.",
+        "<strong>Toast Notifications</strong>: Multiple notifications now stack neatly instead of overlapping.",
       ],
     },
     {
       type: "Improved",
       items: [
-        "<strong>Language Detection</strong>: Enhanced auto-detection handles special filenames (Dockerfile, Makefile, .env, .eslintrc, .babelrc, .htaccess, .gitignore, docker-compose).",
-        "<strong>Theme Dropdown</strong>: All 10 editor themes now appear in the toolbar dropdown (was missing 6 themes).",
-        "<strong>Word Wrap</strong>: Word wrap toggle now works correctly. Setting persists and applies in real time.",
-        "<strong>Modular Architecture</strong>: Refactored into separate modules for editor, toolbar, status bar, detection, formatting, and search.",
-        "<strong>Test Coverage</strong>: Fixed pre-existing test failures. 104 tests passing.",
+        "<strong>Faster Language Detection</strong>: Code language is detected quicker with less memory usage.",
+        "<strong>Faster Code Scanning</strong>: Improved performance when scanning code for formatting.",
+        "<strong>More File Types</strong>: Added support for LESS, JSX, and TSX files.",
+        "<strong>Better Defaults</strong>: Python, YAML, TOML, and other languages now use correct formatting defaults.",
+        "<strong>Settings Page</strong>: Cleaner settings with less code duplication.",
       ],
     },
     {
       type: "Fixed",
       items: [
-        "<strong>Duplicate Null Check</strong>: Removed redundant null check in background message handler.",
-        "<strong>Redundant parentElement</strong>: Fixed duplicate parentElement access in code block detection.",
-        "<strong>Wrap Status Display</strong>: Removed wrap status from status bar (was always showing 'off' regardless of setting).",
-        "<strong>Theme Dropdown</strong>: Fixed missing themes in the options page dropdown.",
-        "<strong>TypeScript Config</strong>: Restored missing tsconfig.json to unblock tests and type checking.",
+        "<strong>Settings Not Saving</strong>: Fixed a bug where some settings could be lost when loading.",
+        "<strong>Memory Leak</strong>: Fixed a memory leak when tabs are closed.",
       ],
     },
   ],
@@ -292,7 +281,11 @@ function renderChangelog(container: HTMLElement): void {
   // Add event listener to close button
   const closeButton: HTMLElement | null = document.getElementById("close-btn");
   closeButton?.addEventListener("click", (): void => {
-    window.close();
+    chrome.tabs.getCurrent((tab) => {
+      if (tab?.id) {
+        chrome.tabs.remove(tab.id);
+      }
+    });
   });
 }
 
@@ -316,7 +309,7 @@ document.addEventListener("DOMContentLoaded", (): void => {
   renderChangelog(container);
 
   // Mark version as seen after user views changelog
-  const currentVersion = (chrome as any).runtime?.getManifest()?.version;
+  const currentVersion = chrome.runtime.getManifest().version;
   if (currentVersion) {
     chrome.storage.local.set({ lastSeenVersion: currentVersion }, () => {
       if (chrome.runtime.lastError) {

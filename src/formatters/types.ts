@@ -16,14 +16,10 @@ export interface FormatterSettings {
   indentTables?: boolean;
   autoFormatOnType?: boolean;
   formatOnPasteMinLength?: number;
+  /** When true, compress (minify) instead of beautifying */
+  minify?: boolean;
   preferredFormatter?: "prettier" | "js-beautify" | "biome";
-}
-
-export interface LanguageDefaults {
-  indentSize: number;
-  useTabs: boolean;
-  singleQuote?: boolean;
-  semi?: boolean;
+  lineWidth?: number;
 }
 
 export interface FormatResult {
@@ -58,11 +54,17 @@ export interface IFormatter {
 
 const LANGUAGE_ALIASES: Record<string, string> = {
   js: "javascript",
+  jsx: "javascript",
   ts: "typescript",
+  tsx: "typescript",
   py: "python",
+  pyi: "python",
   rs: "rust",
   golang: "go",
   yml: "yaml",
+  rb: "ruby",
+  sh: "bash",
+  zsh: "bash",
 };
 
 export function normalizeLanguage(language: string): string {

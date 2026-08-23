@@ -3,13 +3,7 @@
  * Handles reading local files with size limits and language detection
  */
 
-import { getLanguageFromFilename, formatFileSize } from "../shared/utils";
-
-// Re-export for backward compatibility
-export {
-  formatFileSize,
-  getLanguageFromFilename as detectLanguageFromFilename,
-};
+import { getLanguageFromFilename, formatFileSize, CODE_EXTENSIONS_RE } from "../shared/utils";
 
 /**
  * File metadata information
@@ -158,9 +152,7 @@ export function validateFile(file: File): { valid: boolean; error?: string } {
   ];
   const isTextFile =
     textMimeTypes.some((type) => mime.startsWith(type)) ||
-    file.name.match(
-      /\.(js|ts|jsx|tsx|json|css|scss|less|html|htm|xml|md|py|go|rs|sql|yml|yaml|toml|rb|lua|zig|dart)$/i,
-    );
+    CODE_EXTENSIONS_RE.test(file.name);
 
   if (!isTextFile) {
     return {

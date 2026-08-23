@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   detectLanguage,
   appearsToBeCodePage,
-  getLimitedContent,
   DETECTION_PATTERNS,
 } from "./detection";
 
@@ -72,23 +71,6 @@ describe("Detection Module", () => {
       expect(result).not.toBeNull();
     });
   });
-
-  describe("getLimitedContent", () => {
-    it("should return content as-is if under limit", () => {
-      const content = "short content";
-      expect(getLimitedContent(content)).toBe(content);
-    });
-
-    it("should truncate content over limit", () => {
-      const longContent = "x".repeat(60000);
-      const limited = getLimitedContent(longContent);
-      expect(limited.length).toBe(50000);
-    });
-
-    it("should handle empty string", () => {
-      expect(getLimitedContent("")).toBe("");
-    });
-  });
 });
 
 describe("appearsToBeCodePage", () => {
@@ -136,5 +118,50 @@ describe("appearsToBeCodePage", () => {
     document.body.appendChild(pre);
 
     expect(appearsToBeCodePage()).toBe(false);
+  });
+
+  it("should return false on large pages quickly (does not scan everything)", () => {
+    // Create way more than the scan cap to exercise the perf guard
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < 200; i++) {
+      const pre = document.createElement("pre");
+      pre.textContent = "x";
+      frag.appendChild(pre);
+    }
+    document.body.appendChild(frag);
+
+    const t0 = Date.now();
+    const result = appearsToBeCodePage();
+    const elapsed = Date.now() - t0;
+    expect(result).toBe(false);
+    expect(elapsed).toBeLessThan(500);
+  });
+});
+
+describe("detectLanguage shebang mapping", () => {
+  it("maps python shebang to python", () => {
+    expect(detectLanguage("#!/usr/bin/env python3\nprint('hi')")).toBe("python");
+  });
+
+  it("maps node shebang to javascript", () => {
+    expect(detectLanguage("#!/usr/bin/env node\nconsole.log(1)")).toBe("javascript");
+  });
+
+  it("maps bash shebang to bash", () => {
+    expect(detectLanguage("#!/bin/bash\necho hi")).toBe("bash");
+  });
+});
+
+describe("detectLanguage new patterns", () => {
+  it("recognises Dockerfile FROM", () => {
+    expect(detectLanguage("FROM node:18\nRUN npm install")).toBe("dockerfile");
+  });
+
+  it("recognises XML by xmlns attribute", () => {
+    expect(detectLanguage('<root xmlns="urn:x"></root>')).toBe("xml");
+  });
+
+  it("recognises dotenv style KEY=VALUE pairs", () => {
+    expect(detectLanguage("FOO=bar\nBAZ=qux\nLOREM=value")).toBe("dotenv");
   });
 });

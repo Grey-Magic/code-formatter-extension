@@ -1,7 +1,9 @@
-import type { ToastType, ToastOptions } from "./types";
+import type { ToastType } from "./types";
+import { CSS_CLASSES } from "../shared/constants";
 
 const TOAST_FADE_IN_DURATION = 300;
 const TOAST_DEFAULT_DURATION = 3000;
+const TOAST_STACK_GAP = 10;
 
 const TOAST_COLORS: Record<ToastType, string> = {
   error: "#e53935",
@@ -15,7 +17,7 @@ let toastStylesInjected = false;
 function injectToastStyles(): void {
   if (toastStylesInjected) return;
   const style = document.createElement("style");
-  style.id = "code-formatter-toast-styles";
+  style.id = CSS_CLASSES.TOAST_STYLES;
   style.textContent = `
     @keyframes code-formatter-fadeIn { 
       from { opacity: 0; transform: translateX(-50%) translateY(20px); } 
@@ -28,6 +30,16 @@ function injectToastStyles(): void {
   `;
   document.head.appendChild(style);
   toastStylesInjected = true;
+}
+
+const activeToasts: HTMLDivElement[] = [];
+
+function repositionToasts(): void {
+  let bottom = 20;
+  for (const t of activeToasts) {
+    t.style.bottom = `${bottom}px`;
+    bottom += t.offsetHeight + TOAST_STACK_GAP;
+  }
 }
 
 export function showToast(
@@ -52,33 +64,21 @@ export function showToast(
     z-index: 999999;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     animation: code-formatter-fadeIn ${TOAST_FADE_IN_DURATION}ms ease;
+    white-space: nowrap;
   `;
   toast.textContent = message;
 
   document.body.appendChild(toast);
+  activeToasts.push(toast);
+  repositionToasts();
 
   setTimeout(() => {
     toast.style.animation = `code-formatter-fadeOut ${TOAST_FADE_IN_DURATION}ms ease`;
-    setTimeout(() => toast.remove(), TOAST_FADE_IN_DURATION);
+    setTimeout(() => {
+      toast.remove();
+      const idx = activeToasts.indexOf(toast);
+      if (idx !== -1) activeToasts.splice(idx, 1);
+      repositionToasts();
+    }, TOAST_FADE_IN_DURATION);
   }, duration);
-}
-
-export function showSuccess(message: string): void {
-  showToast(message, "success");
-}
-
-export function showError(message: string): void {
-  showToast(message, "error");
-}
-
-export function showInfo(message: string): void {
-  showToast(message, "info");
-}
-
-export function showWarning(message: string): void {
-  showToast(message, "warning");
-}
-
-export function showToastWithOptions(options: ToastOptions): void {
-  showToast(options.message, options.type ?? "info", options.duration);
 }

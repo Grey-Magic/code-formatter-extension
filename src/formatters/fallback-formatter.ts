@@ -4,6 +4,7 @@ import type {
   FormatResult,
   FormatterSettings,
 } from "./types";
+import { scanSegments } from "../shared/code-scan";
 
 export class FallbackFormatter implements IFormatter {
   readonly metadata: FormatterMetadata = {
@@ -53,80 +54,82 @@ export class FallbackFormatter implements IFormatter {
     }
   }
 
-  private formatRust(code: string, indent: string): FormatResult {
-    const lines = code
-      .replace(/\r\n/g, "\n")
-      .replace(/\s*\{\s*/g, " {\n")
-      .replace(/\s*\}\s*/g, "\n}\n")
-      .replace(/;\s*/g, ";\n")
-      .split("\n");
+  private formatWithPattern(
+    code: string,
+    indent: string,
+    replacements: Array<[RegExp, string]>,
+  ): FormatResult {
+    const segments = scanSegments(code, { regexLiterals: false });
+    const codeRanges: Array<[number, number]> = [];
 
+    for (const seg of segments) {
+      if (seg.type === "code") {
+        codeRanges.push([seg.start, seg.end]);
+      }
+    }
+
+    if (codeRanges.length === 0) {
+      codeRanges.push([0, code.length]);
+    }
+
+    let result = "";
+    let cursor = 0;
+
+    for (const [start, end] of codeRanges) {
+      result += code.slice(cursor, start);
+      let segment = code.slice(start, end);
+      segment = segment.replace(/\r\n/g, "\n");
+      for (const [pattern, replacement] of replacements) {
+        segment = segment.replace(pattern, replacement);
+      }
+      result += segment;
+      cursor = end;
+    }
+    result += code.slice(cursor);
+
+    const lines = result.split("\n");
     const formatted = this.formatLinesWithIndentation(lines, indent)
       .join("\n")
       .replace(/\n{3,}/g, "\n\n")
       .trim();
 
     return { success: true, code: formatted };
+  }
+
+  private formatRust(code: string, indent: string): FormatResult {
+    return this.formatWithPattern(code, indent, [
+      [/\s*\{\s*/g, " {\n"],
+      [/\s*\}\s*/g, "\n}\n"],
+      [/;\s*/g, ";\n"],
+    ]);
   }
 
   private formatRuby(code: string, indent: string): FormatResult {
-    const lines = code
-      .replace(/\r\n/g, "\n")
-      .replace(/\s*end\s*/g, "\nend\n")
-      .split("\n");
-
-    const formatted = this.formatLinesWithIndentation(lines, indent)
-      .join("\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-
-    return { success: true, code: formatted };
+    return this.formatWithPattern(code, indent, [
+      [/\s*end\s*/g, "\nend\n"],
+    ]);
   }
 
   private formatLua(code: string, indent: string): FormatResult {
-    const lines = code
-      .replace(/\r\n/g, "\n")
-      .replace(/\s*then\s*/g, " then\n")
-      .replace(/\s*end\s*/g, "\nend\n")
-      .split("\n");
-
-    const formatted = this.formatLinesWithIndentation(lines, indent)
-      .join("\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-
-    return { success: true, code: formatted };
+    return this.formatWithPattern(code, indent, [
+      [/\s*then\s*/g, " then\n"],
+      [/\s*end\s*/g, "\nend\n"],
+    ]);
   }
 
   private formatZig(code: string, indent: string): FormatResult {
-    const lines = code
-      .replace(/\r\n/g, "\n")
-      .replace(/\s*\{\s*/g, " {\n")
-      .replace(/\s*\}\s*/g, "\n}\n")
-      .split("\n");
-
-    const formatted = this.formatLinesWithIndentation(lines, indent)
-      .join("\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-
-    return { success: true, code: formatted };
+    return this.formatWithPattern(code, indent, [
+      [/\s*\{\s*/g, " {\n"],
+      [/\s*\}\s*/g, "\n}\n"],
+    ]);
   }
 
   private formatDart(code: string, indent: string): FormatResult {
-    const lines = code
-      .replace(/\r\n/g, "\n")
-      .replace(/\s*\{\s*/g, " {\n")
-      .replace(/\s*\}\s*/g, "\n}\n")
-      .replace(/;\s*/g, ";\n")
-      .split("\n");
-
-    const formatted = this.formatLinesWithIndentation(lines, indent)
-      .join("\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-
-    return { success: true, code: formatted };
+    return this.formatWithPattern(code, indent, [
+      [/\s*\{\s*/g, " {\n"],
+      [/\s*\}\s*/g, "\n}\n"],
+      [/;\s*/g, ";\n"],
+    ]);
   }
 
   private formatGeneric(code: string, indent: string): FormatResult {
@@ -149,11 +152,17 @@ export class FallbackFormatter implements IFormatter {
       const trimmed = line.trim();
       if (!trimmed) return "";
 
-      const openCount = (trimmed.match(/[\{\[\(]/g) || []).length;
-      const closeCount = (trimmed.match(/[\}\]\)]/g) || []).length;
+      let openCount = 0;
+      let closeCount = 0;
+      for (let i = 0; i < trimmed.length; i++) {
+        const ch = trimmed.charCodeAt(i);
+        if (ch === 123 || ch === 91 || ch === 40) openCount++;
+        else if (ch === 125 || ch === 93 || ch === 41) closeCount++;
+      }
 
       let currentIndent = indentLevel;
-      if (trimmed.match(/^[\}\]\)]/)) {
+      const firstChar = trimmed.charCodeAt(0);
+      if (firstChar === 125 || firstChar === 93 || firstChar === 41) {
         currentIndent = Math.max(0, indentLevel - 1);
       }
 

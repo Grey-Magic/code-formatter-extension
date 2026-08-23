@@ -3,37 +3,13 @@
  * Handles settings management, form interactions, and Chrome storage synchronization
  */
 
-import type { ThemeName } from "./shared/types";
+import type { ThemeName, ExtensionSettings } from "./shared/types";
+import { DEFAULT_SETTINGS, AVAILABLE_THEMES, LANGUAGE_DEFAULTS } from "./shared/constants";
 
 /**
- * Local settings interface for options page
- * All properties are required with defaults
+ * Local settings interface — all properties required for options page binding
  */
-interface FormatterSettings {
-  indentSize: number;
-  quoteStyle: "single" | "double";
-  theme: ThemeName;
-  wrapLines: boolean;
-  fontSize: string;
-  lineHeight: number;
-  useTabs: boolean;
-  // Formatter options
-  singleQuote: boolean;
-  semi: boolean;
-  trailingComma: "none" | "es5" | "all";
-  // js-beautify options
-  e4x: boolean;
-  spaceInEmptyParens: boolean;
-  unescapeStrings: boolean;
-  keepArrayIndentation: boolean;
-  // WASM formatter options
-  quoteStyleWasm: "single" | "double" | "preserve";
-  keywordCase: "upper" | "lower" | "preserve";
-  commaPosition: "before" | "after";
-  // Feature flags
-  autoFormatOnType: boolean;
-  formatOnPasteMinLength: number;
-}
+type FormatterSettings = Required<ExtensionSettings>;
 
 /**
  * Type for notification display types
@@ -99,6 +75,15 @@ document.addEventListener("DOMContentLoaded", function (): void {
   const preferredFormatter: HTMLSelectElement | null = document.getElementById(
     "preferred-formatter",
   ) as HTMLSelectElement | null;
+  const useTabs: HTMLInputElement | null = document.getElementById(
+    "use-tabs",
+  ) as HTMLInputElement | null;
+  const minifyMode: HTMLInputElement | null = document.getElementById(
+    "minify-mode",
+  ) as HTMLInputElement | null;
+  const ignoredSites: HTMLTextAreaElement | null = document.getElementById(
+    "ignored-sites",
+  ) as HTMLTextAreaElement | null;
 
   // js-beautify options
   const e4x: HTMLInputElement | null = document.getElementById(
@@ -143,42 +128,24 @@ document.addEventListener("DOMContentLoaded", function (): void {
     !trailingComma ||
     !autoFormatOnType ||
     !formatOnPasteMinLength ||
+    !preferredFormatter ||
     !e4x ||
     !spaceInEmptyParens ||
     !unescapeStrings ||
     !keepArrayIndentation ||
     !quoteStyleWasm ||
     !keywordCase ||
-    !commaPosition
+    !commaPosition ||
+    !useTabs ||
+    !minifyMode ||
+    !ignoredSites
   ) {
     console.error("[Code Formatter] Required DOM elements not found");
     return;
   }
 
-  // Default settings
-  const defaultSettings: FormatterSettings = {
-    indentSize: 2,
-    quoteStyle: "single",
-    theme: "one-dark-pro",
-    wrapLines: false,
-    fontSize: "14",
-    lineHeight: 1.6,
-    useTabs: false,
-    singleQuote: true,
-    semi: true,
-    trailingComma: "es5",
-    autoFormatOnType: false,
-    formatOnPasteMinLength: 5,
-    // js-beautify options
-    e4x: false,
-    spaceInEmptyParens: false,
-    unescapeStrings: false,
-    keepArrayIndentation: false,
-    // WASM formatter options
-    quoteStyleWasm: "preserve",
-    keywordCase: "preserve",
-    commaPosition: "before",
-  };
+  // Use settings from constants module
+  const defaultSettings = { ...DEFAULT_SETTINGS } as FormatterSettings;
 
   // Theme management
   document.documentElement.setAttribute("data-theme", "dark");
@@ -258,6 +225,11 @@ document.addEventListener("DOMContentLoaded", function (): void {
       "quoteStyleWasm",
       "keywordCase",
       "commaPosition",
+      // Tabs/spaces
+      "useTabs",
+      // Minify + site ignore
+      "minify",
+      "ignoredSites",
       // Formatter selection
       "preferredFormatter",
     ];
@@ -294,6 +266,8 @@ document.addEventListener("DOMContentLoaded", function (): void {
             : defaultSettings.singleQuote;
         semi!.checked =
           result.semi !== undefined ? result.semi : defaultSettings.semi;
+        useTabs!.checked =
+          result.useTabs !== undefined ? result.useTabs : defaultSettings.useTabs;
         trailingComma!.value =
           result.trailingComma || defaultSettings.trailingComma;
         autoFormatOnType!.checked =
@@ -327,6 +301,14 @@ document.addEventListener("DOMContentLoaded", function (): void {
         keywordCase!.value = result.keywordCase || defaultSettings.keywordCase;
         commaPosition!.value =
           result.commaPosition || defaultSettings.commaPosition;
+
+        minifyMode!.checked =
+          typeof result.minify === "boolean"
+            ? result.minify
+            : defaultSettings.minify;
+        ignoredSites!.value = (
+          Array.isArray(result.ignoredSites) ? result.ignoredSites : []
+        ).join("\n");
 
         // Formatter selection
         preferredFormatter!.value =
@@ -391,26 +373,13 @@ document.addEventListener("DOMContentLoaded", function (): void {
         quoteStyle.value === "single" || quoteStyle.value === "double"
           ? quoteStyle.value
           : defaultSettings.quoteStyle,
-      theme: [
-        "one-dark-pro",
-        "dracula",
-        "nord",
-        "monokai",
-        "material",
-        "github-dark",
-        "github-light",
-        "solarized-dark",
-        "solarized-light",
-        "tokyo-night",
-      ].includes(theme.value)
+      theme: AVAILABLE_THEMES.some((t) => t.value === theme.value)
         ? (theme.value as ThemeName)
         : defaultSettings.theme,
       wrapLines: wrapLines.checked,
       fontSize: fontSize.value,
       lineHeight: lineHeightValueNum,
-      // Note: useTabs has no UI control in options page
-      // Default to false (spaces) as that's the more common convention
-      useTabs: false,
+      useTabs: useTabs.checked,
       singleQuote: singleQuote.checked,
       semi: semi.checked,
       trailingComma:
@@ -443,6 +412,11 @@ document.addEventListener("DOMContentLoaded", function (): void {
         commaPosition.value === "before" || commaPosition.value === "after"
           ? commaPosition.value
           : defaultSettings.commaPosition,
+      minify: minifyMode.checked,
+      ignoredSites: ignoredSites.value
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0),
       preferredFormatter:
         preferredFormatter.value === "prettier" ||
         preferredFormatter.value === "js-beautify" ||
@@ -485,6 +459,7 @@ document.addEventListener("DOMContentLoaded", function (): void {
     singleQuote.checked = defaultSettings.singleQuote;
     semi.checked = defaultSettings.semi;
     trailingComma.value = defaultSettings.trailingComma;
+    useTabs.checked = defaultSettings.useTabs;
     autoFormatOnType.checked = defaultSettings.autoFormatOnType;
     formatOnPasteMinLength.value = String(
       defaultSettings.formatOnPasteMinLength,
@@ -500,6 +475,8 @@ document.addEventListener("DOMContentLoaded", function (): void {
     quoteStyleWasm.value = defaultSettings.quoteStyleWasm;
     keywordCase.value = defaultSettings.keywordCase;
     commaPosition.value = defaultSettings.commaPosition;
+    minifyMode.checked = defaultSettings.minify;
+    ignoredSites.value = defaultSettings.ignoredSites.join("\n");
 
     syncLineHeightElements();
 

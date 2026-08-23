@@ -53,9 +53,15 @@ async function loadPlugin(name: string): Promise<any> {
   return plugin;
 }
 
+const BUILTIN_PARSERS = new Set(["dockerfile"]);
+
 async function loadPluginsForLanguage(language: string): Promise<any[]> {
   const plugins: any[] = [];
   const lang = language.toLowerCase();
+
+  if (BUILTIN_PARSERS.has(lang)) {
+    return plugins;
+  }
 
   switch (lang) {
     case "javascript":
@@ -81,8 +87,6 @@ async function loadPluginsForLanguage(language: string): Promise<any[]> {
       break;
     case "markdown":
       plugins.push(await loadPlugin("markdown"));
-      break;
-    case "dockerfile":
       break;
   }
 
@@ -123,7 +127,7 @@ export class PrettierFormatter implements IFormatter {
         loadPluginsForLanguage(language),
       ]);
 
-      if (plugins.length === 0) {
+      if (plugins.length === 0 && !BUILTIN_PARSERS.has(language.toLowerCase())) {
         return {
           success: false,
           code,

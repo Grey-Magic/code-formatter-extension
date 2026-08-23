@@ -14,7 +14,7 @@ import {
   searchMatchSelectedDecoration,
 } from "./search-highlight";
 
-const DANGEROUS_SVG_ELEMENTS = [
+const DANGEROUS_SVG_ELEMENTS = new Set([
   "script",
   "foreignObject",
   "iframe",
@@ -23,9 +23,9 @@ const DANGEROUS_SVG_ELEMENTS = [
   "use",
   "animate",
   "set",
-];
+]);
 
-const DANGEROUS_SVG_ATTRS = [
+const DANGEROUS_SVG_ATTRS = new Set([
   "onload",
   "onclick",
   "onerror",
@@ -49,9 +49,23 @@ const DANGEROUS_SVG_ATTRS = [
   "src",
   "data",
   "xmlns:xlink",
-];
+]);
 
-const DANGEROUS_URL_PROTOCOLS = ["javascript:", "data:", "vbscript:", "file:"];
+const DANGEROUS_URL_ATTRS = new Set([
+  "href",
+  "src",
+  "xlink:href",
+  "data",
+  "poster",
+  "formaction",
+]);
+
+const DANGEROUS_URL_PROTOCOLS = new Set([
+  "javascript:",
+  "data:",
+  "vbscript:",
+  "file:",
+]);
 
 let currentSettings: ExtensionSettings;
 let editorInstance: EditorView | null = null;
@@ -63,6 +77,7 @@ type ToggleOriginalCallback = () => void;
 type OpenFileDialogCallback = () => void;
 type GetCodeCallback = () => string;
 type BatchFormatCallback = () => void;
+type ToggleMinifyCallback = () => void;
 
 let onSaveSettings: SaveSettingsCallback | null = null;
 let onApplyTheme: ApplyThemeCallback | null = null;
@@ -71,6 +86,8 @@ let onOpenFileDialog: OpenFileDialogCallback | null = null;
 let onGetCode: GetCodeCallback | null = null;
 let onDownload: ((code: string, language: string) => void) | null = null;
 let onBatchFormat: BatchFormatCallback | null = null;
+let onToggleMinify: ToggleMinifyCallback | null = null;
+let minifyButton: HTMLButtonElement | null = null;
 
 export function initToolbar(
   settings: ExtensionSettings,
@@ -82,6 +99,7 @@ export function initToolbar(
     getCode?: GetCodeCallback;
     onDownload?: (code: string, language: string) => void;
     batchFormat?: BatchFormatCallback;
+    toggleMinify?: ToggleMinifyCallback;
   },
 ): void {
   currentSettings = settings;
@@ -92,6 +110,8 @@ export function initToolbar(
   onGetCode = callbacks.getCode ?? null;
   onDownload = callbacks.onDownload ?? null;
   onBatchFormat = callbacks.batchFormat ?? null;
+  onToggleMinify = callbacks.toggleMinify ?? null;
+  syncMinifyButton();
 }
 
 export function setEditorInstance(editor: EditorView | null): void {
@@ -102,9 +122,19 @@ export function setCurrentLanguage(language: string): void {
   currentLanguage = language;
 }
 
+/** Update the toolbar's minify button to reflect the active setting */
+export function syncMinifyButton(): void {
+  if (minifyButton) {
+    minifyButton.classList.toggle("active", !!currentSettings.minify);
+  }
+}
+
 function isDangerousUrl(value: string): boolean {
   const lower = value.toLowerCase().trim();
-  return DANGEROUS_URL_PROTOCOLS.some((proto) => lower.startsWith(proto));
+  for (const proto of DANGEROUS_URL_PROTOCOLS) {
+    if (lower.startsWith(proto)) return true;
+  }
+  return false;
 }
 
 export function sanitizeSvg(svgElement: SVGElement): SVGElement {
@@ -117,20 +147,12 @@ export function sanitizeSvg(svgElement: SVGElement): SVGElement {
   allElements.forEach((el) => {
     const elAttrs = Array.from(el.attributes);
     for (const attr of elAttrs) {
-      if (DANGEROUS_SVG_ATTRS.includes(attr.name.toLowerCase())) {
+      const name = attr.name.toLowerCase();
+      if (DANGEROUS_SVG_ATTRS.has(name) || name.startsWith("on")) {
         el.removeAttribute(attr.name);
         continue;
       }
-      if (attr.name.toLowerCase().startsWith("on")) {
-        el.removeAttribute(attr.name);
-        continue;
-      }
-      if (
-        ["href", "src", "xlink:href", "data", "poster", "formaction"].includes(
-          attr.name.toLowerCase(),
-        ) &&
-        isDangerousUrl(attr.value)
-      ) {
+      if (DANGEROUS_URL_ATTRS.has(name) && isDangerousUrl(attr.value)) {
         el.removeAttribute(attr.name);
       }
     }
@@ -138,18 +160,12 @@ export function sanitizeSvg(svgElement: SVGElement): SVGElement {
 
   const rootAttrs = Array.from(svgElement.attributes);
   for (const attr of rootAttrs) {
-    if (DANGEROUS_SVG_ATTRS.includes(attr.name.toLowerCase())) {
+    const name = attr.name.toLowerCase();
+    if (DANGEROUS_SVG_ATTRS.has(name) || name.startsWith("on")) {
       svgElement.removeAttribute(attr.name);
       continue;
     }
-    if (attr.name.toLowerCase().startsWith("on")) {
-      svgElement.removeAttribute(attr.name);
-      continue;
-    }
-    if (
-      ["href", "src", "xlink:href"].includes(attr.name.toLowerCase()) &&
-      isDangerousUrl(attr.value)
-    ) {
+    if (DANGEROUS_URL_ATTRS.has(name) && isDangerousUrl(attr.value)) {
       svgElement.removeAttribute(attr.name);
     }
   }
@@ -157,6 +173,8 @@ export function sanitizeSvg(svgElement: SVGElement): SVGElement {
   svgElement.removeAttribute("xmlns:xlink");
   return svgElement;
 }
+
+const svgCache = new Map<string, SVGElement>();
 
 export function createToolbarButton(
   id: string,
@@ -170,18 +188,24 @@ export function createToolbarButton(
   btn.title = title;
 
   const iconContainer = document.createElement("span");
-  const parser = new DOMParser();
 
-  const svgWithNs = iconSvg.includes("xmlns")
-    ? iconSvg
-    : iconSvg.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+  const cached = svgCache.get(iconSvg);
+  if (cached) {
+    iconContainer.appendChild(cached.cloneNode(true));
+  } else {
+    const parser = new DOMParser();
+    const svgWithNs = iconSvg.includes("xmlns")
+      ? iconSvg
+      : iconSvg.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
 
-  const doc = parser.parseFromString(svgWithNs, "image/svg+xml");
-  const svgElement = doc.documentElement;
+    const doc = parser.parseFromString(svgWithNs, "image/svg+xml");
+    const svgElement = doc.documentElement;
 
-  if (svgElement instanceof SVGElement) {
-    const sanitizedSvg = sanitizeSvg(svgElement);
-    iconContainer.appendChild(sanitizedSvg);
+    if (svgElement instanceof SVGElement) {
+      const sanitizedSvg = sanitizeSvg(svgElement);
+      svgCache.set(iconSvg, sanitizedSvg);
+      iconContainer.appendChild(sanitizedSvg.cloneNode(true));
+    }
   }
 
   btn.appendChild(iconContainer);
@@ -210,37 +234,39 @@ function createSearchBar(
   onClose: () => void,
 ): HTMLElement {
   const bar = document.createElement("div");
-  bar.className = "code-formatter-search-bar";
+  bar.className = CSS_CLASSES.SEARCH_BAR;
   bar.style.display = "none";
 
   const input = document.createElement("input");
   input.type = "text";
   input.placeholder = "Find...";
-  input.className = "code-formatter-search-input";
+  input.className = CSS_CLASSES.SEARCH_INPUT;
 
   const prevBtn = document.createElement("button");
-  prevBtn.className = "code-formatter-search-btn";
+  prevBtn.className = CSS_CLASSES.SEARCH_BTN;
   prevBtn.title = "Previous (Shift+Enter)";
   prevBtn.innerHTML =
     '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>';
 
   const nextBtn = document.createElement("button");
-  nextBtn.className = "code-formatter-search-btn";
+  nextBtn.className = CSS_CLASSES.SEARCH_BTN;
   nextBtn.title = "Next (Enter)";
   nextBtn.innerHTML =
     '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>';
 
   const closeBtn = document.createElement("button");
-  closeBtn.className = "code-formatter-search-btn code-formatter-search-close";
+  closeBtn.className = `${CSS_CLASSES.SEARCH_BTN} ${CSS_CLASSES.SEARCH_CLOSE}`;
   closeBtn.title = "Close (Esc)";
   closeBtn.innerHTML =
     '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
 
   const matchCount = document.createElement("span");
-  matchCount.className = "code-formatter-search-count";
+  matchCount.className = CSS_CLASSES.SEARCH_COUNT;
 
   let currentMatches: SearchResult[] = [];
   let currentMatchIndex = -1;
+
+  const MAX_SEARCH_MATCHES = 1000;
 
   const findMatches = (searchTerm: string): SearchResult[] => {
     if (!editor || !searchTerm) return [];
@@ -260,6 +286,7 @@ function createSearchBar(
           from: match.index,
           to: match.index + match[0].length,
         });
+        if (matches.length >= MAX_SEARCH_MATCHES) break;
       }
     } catch {
       // Invalid regex
@@ -297,14 +324,11 @@ function createSearchBar(
     const match = currentMatches[index];
 
     editor.dispatch({
-      effects: EditorView.scrollIntoView(match.from, { y: "center" }),
-    });
-
-    editor.dispatch({
       selection: EditorSelection.create([
         EditorSelection.range(match.from, match.to),
         EditorSelection.cursor(match.to),
       ]),
+      effects: EditorView.scrollIntoView(match.from, { y: "center" }),
       scrollIntoView: true,
     });
 
@@ -463,7 +487,7 @@ export function createToolbar(): HTMLElement {
 
   // Toggle Original/Formatted button
   const toggleOriginalBtn = createToolbarButton(
-    "code-formatter-toggle-original",
+    ELEMENT_IDS.BUTTON_TOGGLE_ORIGINAL,
     "Show Original Code",
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><circle cx="11" cy="11" r="2"></circle></svg>',
     "Original",
@@ -508,15 +532,28 @@ export function createToolbar(): HTMLElement {
 
   // Batch Format All button
   const batchFormatBtn = createToolbarButton(
-    "code-formatter-batch-format",
+    ELEMENT_IDS.BUTTON_BATCH_FORMAT,
     "Format All Blocks (Ctrl+Shift+B)",
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>',
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="9" x2="21" y1="9"></line><line x1="3" y1="15" x2="21" y1="15"></line></svg>',
     "Batch Format",
   );
   batchFormatBtn.addEventListener("click", () => {
     onBatchFormat?.();
   });
   toolbar.appendChild(batchFormatBtn);
+
+  // Minify toggle
+  minifyButton = createToolbarButton(
+    ELEMENT_IDS.BUTTON_MINIFY,
+    "Toggle minified output (Ctrl+Shift+M)",
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>',
+    "Minify",
+  );
+  minifyButton.addEventListener("click", () => {
+    onToggleMinify?.();
+  });
+  minifyButton.classList.toggle("active", !!currentSettings.minify);
+  toolbar.appendChild(minifyButton);
 
   toolbar.appendChild(createSeparator());
 
@@ -553,7 +590,7 @@ export function createToolbar(): HTMLElement {
 
   // Print button
   const printBtn = createToolbarButton(
-    "code-formatter-print",
+    ELEMENT_IDS.BUTTON_PRINT,
     "Print Formatted Code",
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>',
     "Print",
@@ -583,4 +620,5 @@ export function downloadCode(code: string, language: string): void {
 
 export function updateSettings(settings: ExtensionSettings): void {
   currentSettings = settings;
+  syncMinifyButton();
 }

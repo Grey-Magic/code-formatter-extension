@@ -4,6 +4,7 @@ export * from './wasm-loader';
 export { PrettierFormatter } from './prettier-formatter';
 export { JsBeautifyFormatter } from './js-beautify-formatter';
 export { FallbackFormatter } from './fallback-formatter';
+export { MinifyFormatter, MINIFY_LANGUAGES } from './minify';
 export {
   RuffFormatter,
   GofmtFormatter,

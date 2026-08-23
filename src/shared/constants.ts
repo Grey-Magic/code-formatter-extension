@@ -73,6 +73,10 @@ export const ELEMENT_IDS = {
   BUTTON_COPY: "code-formatter-toolbar-button-copy",
   BUTTON_DOWNLOAD: "code-formatter-toolbar-button-download",
   BUTTON_OPEN_FILE: "code-formatter-toolbar-button-open-file",
+  BUTTON_TOGGLE_ORIGINAL: "code-formatter-toggle-original",
+  BUTTON_BATCH_FORMAT: "code-formatter-batch-format",
+  BUTTON_MINIFY: "code-formatter-toolbar-button-minify",
+  BUTTON_PRINT: "code-formatter-print",
   STATUS_BAR: "code-formatter-status-bar",
   DROP_ZONE: "code-formatter-drop-zone",
   FILE_INPUT: "code-formatter-file-input",
@@ -92,6 +96,14 @@ export const CSS_CLASSES = {
   DROP_ZONE: "code-formatter-drop-zone",
   DROP_ZONE_ACTIVE: "code-formatter-drop-zone--active",
   DROP_ZONE_DRAGOVER: "code-formatter-drop-zone--dragover",
+  DROP_ZONE_CONTENT: "code-formatter-drop-zone__content",
+  DROP_ZONE_TEXT: "code-formatter-drop-zone__text",
+  SEARCH_BAR: "code-formatter-search-bar",
+  SEARCH_INPUT: "code-formatter-search-input",
+  SEARCH_BTN: "code-formatter-search-btn",
+  SEARCH_CLOSE: "code-formatter-search-close",
+  SEARCH_COUNT: "code-formatter-search-count",
+  TOAST_STYLES: "code-formatter-toast-styles",
 } as const;
 
 export const COLORS = {
@@ -108,6 +120,7 @@ export const COLORS = {
 } as const;
 
 export const AVAILABLE_THEMES = [
+  { value: "auto", label: "Auto (system)" },
   { value: "one-dark-pro", label: "One Dark Pro" },
   { value: "dracula", label: "Dracula" },
   { value: "nord", label: "Nord" },
@@ -147,6 +160,8 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   commaPosition: "before",
   autoFormatOnType: false,
   formatOnPasteMinLength: 5,
+  minify: false,
+  ignoredSites: [],
   preferredFormatter: "prettier",
 };
 
@@ -156,7 +171,7 @@ export const LANGUAGE_DEFAULTS: Record<
 > = {
   javascript: { indentSize: 2, useTabs: false, singleQuote: true, semi: true },
   typescript: { indentSize: 2, useTabs: false, singleQuote: true, semi: true },
-  python: { indentSize: 4, useTabs: false, singleQuote: true, semi: true },
+  python: { indentSize: 4, useTabs: false, singleQuote: true, semi: false },
   go: { indentSize: 4, useTabs: true, singleQuote: true, semi: true },
   java: { indentSize: 4, useTabs: false, singleQuote: false, semi: true },
   css: { indentSize: 2, useTabs: false, singleQuote: false, semi: true },
@@ -164,10 +179,10 @@ export const LANGUAGE_DEFAULTS: Record<
   json: { indentSize: 2, useTabs: false, singleQuote: false, semi: true },
   rust: { indentSize: 4, useTabs: false, singleQuote: true, semi: true },
   sql: { indentSize: 2, useTabs: false, singleQuote: false, semi: true },
-  yaml: { indentSize: 2, useTabs: false, singleQuote: false, semi: true },
-  toml: { indentSize: 2, useTabs: false, singleQuote: false, semi: true },
-  markdown: { indentSize: 2, useTabs: false, singleQuote: false, semi: true },
-  dockerfile: { indentSize: 2, useTabs: false, singleQuote: false, semi: true },
+  yaml: { indentSize: 2, useTabs: false, singleQuote: false, semi: false },
+  toml: { indentSize: 2, useTabs: false, singleQuote: false, semi: false },
+  markdown: { indentSize: 2, useTabs: false, singleQuote: false, semi: false },
+  dockerfile: { indentSize: 2, useTabs: false, singleQuote: false, semi: false },
   makefile: { indentSize: 2, useTabs: true, singleQuote: false, semi: false },
   dotenv: { indentSize: 2, useTabs: false, singleQuote: false, semi: false },
 };
@@ -175,9 +190,12 @@ export const LANGUAGE_DEFAULTS: Record<
 export const FORMATTABLE_LANGUAGES = new Set([
   "javascript",
   "typescript",
+  "jsx",
+  "tsx",
   "json",
   "css",
   "scss",
+  "less",
   "html",
   "xml",
   "python",
@@ -193,6 +211,7 @@ export const FORMATTABLE_LANGUAGES = new Set([
   "dockerfile",
   "makefile",
   "dotenv",
+  "markdown",
 ]);
 
 export const CONTEXT_MENU_LANGUAGE_MAP: Record<string, string> = {
@@ -203,9 +222,24 @@ export const CONTEXT_MENU_LANGUAGE_MAP: Record<string, string> = {
   formatJSON: "json",
   formatPython: "python",
   formatGo: "go",
+  formatRust: "rust",
   formatSQL: "sql",
   formatYAML: "yaml",
   formatTOML: "toml",
+  formatRuby: "ruby",
+  formatLua: "lua",
+  formatZig: "zig",
+  formatDart: "dart",
+  formatPHP: "php",
+  formatJava: "java",
+  formatC: "c",
+  formatCpp: "cpp",
+  formatCSharp: "csharp",
+  formatSwift: "swift",
+  formatKotlin: "kotlin",
+  formatScala: "scala",
+  formatR: "r",
+  formatBash: "bash",
   formatDockerfile: "dockerfile",
   formatMakefile: "makefile",
 };

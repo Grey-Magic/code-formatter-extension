@@ -2,11 +2,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   createStatusBar,
   updateStatusBarWithFile,
-  getStatusBar,
-  setStatusBar,
 } from "./status-bar";
 import { DEFAULT_SETTINGS } from "../shared/constants";
 import type { ExtensionSettings } from "../shared/types";
+
+const STATUS_BAR_ID = "code-formatter-status-bar";
+
+function getStatusBar(): HTMLElement | null {
+  return document.getElementById(STATUS_BAR_ID);
+}
 
 describe("Status Bar Module", () => {
   let settings: ExtensionSettings;
@@ -18,7 +22,6 @@ describe("Status Bar Module", () => {
 
   afterEach(() => {
     document.body.innerHTML = "";
-    setStatusBar(null);
   });
 
   describe("createStatusBar", () => {
@@ -27,7 +30,7 @@ describe("Status Bar Module", () => {
       const bar = createStatusBar("javascript", code, settings);
 
       expect(bar).toBeTruthy();
-      expect(bar.id).toBe("code-formatter-status-bar");
+      expect(bar.id).toBe(STATUS_BAR_ID);
       expect(bar.className).toBe("code-formatter-status-bar");
     });
 
@@ -75,20 +78,13 @@ describe("Status Bar Module", () => {
       expect(bar).toBeTruthy();
       expect(settings.wrapLines).toBe(true);
     });
-
-    it("should set status bar element reference", () => {
-      const code = "const x = 10;";
-      createStatusBar("javascript", code, settings);
-
-      expect(getStatusBar()).toBeTruthy();
-    });
   });
 
   describe("updateStatusBarWithFile", () => {
     beforeEach(() => {
       const code = "const x = 10;";
-      createStatusBar("javascript", code, settings);
-      document.body.appendChild(getStatusBar()!);
+      const bar = createStatusBar("javascript", code, settings);
+      document.body.appendChild(bar);
     });
 
     it("should add file info to status bar", () => {
@@ -126,19 +122,6 @@ describe("Status Bar Module", () => {
 
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
-    });
-  });
-
-  describe("getStatusBar / setStatusBar", () => {
-    it("should return null initially", () => {
-      setStatusBar(null);
-      expect(getStatusBar()).toBeNull();
-    });
-
-    it("should return set element", () => {
-      const div = document.createElement("div");
-      setStatusBar(div);
-      expect(getStatusBar()).toBe(div);
     });
   });
 });

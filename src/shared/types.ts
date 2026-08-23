@@ -27,12 +27,17 @@ export interface ExtensionSettings {
   // Feature flags
   autoFormatOnType?: boolean;
   formatOnPasteMinLength?: number;
+  /** Compress output instead of beautifying */
+  minify?: boolean;
+  /** Domains where the extension should not run ("*.example.com" wildcards allowed) */
+  ignoredSites?: string[];
   // Formatter selection
   preferredFormatter?: "prettier" | "js-beautify" | "biome";
 }
 
 /** Available theme names */
 export type ThemeName =
+  | "auto"
   | "one-dark-pro"
   | "dracula"
   | "nord"
@@ -43,24 +48,6 @@ export type ThemeName =
   | "solarized-dark"
   | "solarized-light"
   | "tokyo-night";
-
-/** Supported language identifiers */
-export type LanguageId =
-  | "javascript"
-  | "typescript"
-  | "json"
-  | "css"
-  | "scss"
-  | "html"
-  | "xml"
-  | "python"
-  | "markdown"
-  | "go"
-  | "rust"
-  | "sql"
-  | "yaml"
-  | "toml"
-  | "ruby";
 
 /** Messages sent between content script and background */
 export interface FormatMessage {
@@ -104,12 +91,3 @@ export interface CheckLanguageSupportResponse {
   success: boolean;
   isSupported: boolean;
 }
-
-/**
- * Union type for all possible responses from background script
- */
-export type BackgroundResponse =
-  | FormatResponse
-  | GetSupportedLanguagesResponse
-  | CheckLanguageSupportResponse
-  | { success: boolean; error: string };

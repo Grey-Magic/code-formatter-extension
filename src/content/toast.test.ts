@@ -1,11 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  showToast,
-  showSuccess,
-  showError,
-  showInfo,
-  showWarning,
-} from "./toast";
+import { showToast } from "./toast";
 
 describe("Toast Module", () => {
   beforeEach(() => {
@@ -37,34 +31,6 @@ describe("Toast Module", () => {
 
       vi.advanceTimersByTime(1300);
       expect(document.body.textContent).not.toContain("Test");
-    });
-  });
-
-  describe("showSuccess", () => {
-    it("should show toast with success message", () => {
-      showSuccess("Success!");
-      expect(document.body.textContent).toContain("Success!");
-    });
-  });
-
-  describe("showError", () => {
-    it("should show toast with error message", () => {
-      showError("Error!");
-      expect(document.body.textContent).toContain("Error!");
-    });
-  });
-
-  describe("showInfo", () => {
-    it("should show toast with info message", () => {
-      showInfo("Info!");
-      expect(document.body.textContent).toContain("Info!");
-    });
-  });
-
-  describe("showWarning", () => {
-    it("should show toast with warning message", () => {
-      showWarning("Warning!");
-      expect(document.body.textContent).toContain("Warning!");
     });
   });
 });

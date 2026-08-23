@@ -1,16 +1,8 @@
 import { ELEMENT_IDS, CSS_CLASSES, COLORS } from "../shared/constants";
-import { formatFileSize } from "../formatters/file-loader";
+import { formatFileSize, countNewlines } from "../shared/utils";
 import type { ExtensionSettings } from "../shared/types";
 
 let statusBarElement: HTMLElement | null = null;
-
-export function getStatusBar(): HTMLElement | null {
-  return statusBarElement;
-}
-
-export function setStatusBar(element: HTMLElement | null): void {
-  statusBarElement = element;
-}
 
 export function createStatusBar(
   language: string,
@@ -21,10 +13,8 @@ export function createStatusBar(
   bar.id = ELEMENT_IDS.STATUS_BAR;
   bar.className = CSS_CLASSES.STATUS_BAR;
 
-  const lineCount = code.split("\n").length;
-  const fileSize = new Blob([code]).size;
-  const sizeLabel =
-    fileSize > 1024 ? `${(fileSize / 1024).toFixed(1)} KB` : `${fileSize} B`;
+  const lineCount = countNewlines(code);
+  const sizeLabel = formatFileSize(code.length);
 
   const makeItem = (text: string): HTMLSpanElement => {
     const item = document.createElement("span");
@@ -72,16 +62,9 @@ export function updateStatusBarWithFile(
   fileItem.style.color = COLORS.ACTIVE;
 
   const langItem = statusBarElement.querySelector(
-    ".code-formatter-status-bar__item",
+    `.${CSS_CLASSES.STATUS_BAR_ITEM}`,
   );
   if (langItem && langItem.nextSibling) {
     statusBarElement.insertBefore(fileItem, langItem.nextSibling);
-  }
-}
-
-export function removeStatusBar(): void {
-  if (statusBarElement) {
-    statusBarElement.remove();
-    statusBarElement = null;
   }
 }
