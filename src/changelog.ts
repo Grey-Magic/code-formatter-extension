@@ -40,36 +40,54 @@ interface ChangelogData {
  * The changelog data containing version information and categorized changes
  */
 const changelogData: ChangelogData = {
-  version: "1.9.7",
-  date: "2026-08-23",
+  version: "1.9.8",
+  date: "2026-09-02",
   changes: [
-    {
-      type: "New",
-      items: [
-        "<strong>Use Tabs Option</strong>: New toggle in Settings to use tabs instead of spaces.",
-        "<strong>More Languages</strong>: Right-click menu now supports 28 languages including Rust, Ruby, PHP, Java, Swift, Kotlin, and more.",
-        "<strong>Toast Notifications</strong>: Multiple notifications now stack neatly instead of overlapping.",
-      ],
-    },
-    {
-      type: "Improved",
-      items: [
-        "<strong>Faster Language Detection</strong>: Code language is detected quicker with less memory usage.",
-        "<strong>Faster Code Scanning</strong>: Improved performance when scanning code for formatting.",
-        "<strong>More File Types</strong>: Added support for LESS, JSX, and TSX files.",
-        "<strong>Better Defaults</strong>: Python, YAML, TOML, and other languages now use correct formatting defaults.",
-        "<strong>Settings Page</strong>: Cleaner settings with less code duplication.",
-      ],
-    },
     {
       type: "Fixed",
       items: [
-        "<strong>Settings Not Saving</strong>: Fixed a bug where some settings could be lost when loading.",
-        "<strong>Memory Leak</strong>: Fixed a memory leak when tabs are closed.",
+        "<strong>Homepage / New Tab Override</strong>: The extension no longer opens a tab on install or update, which was overriding users' custom <code>browser.startup.homepage</code> and <code>browser.newtab.url</code> preferences. The \"What's New\" changelog is still available from the options page.",
       ],
     },
   ],
 };
+
+/**
+ * Earlier releases shown beneath the current one.
+ */
+const previousReleases: ChangelogData[] = [
+  {
+    version: "1.9.7",
+    date: "2026-08-23",
+    changes: [
+      {
+        type: "New",
+        items: [
+          "<strong>Use Tabs Option</strong>: New toggle in Settings to use tabs instead of spaces.",
+          "<strong>More Languages</strong>: Right-click menu now supports 28 languages including Rust, Ruby, PHP, Java, Swift, Kotlin, and more.",
+          "<strong>Toast Notifications</strong>: Multiple notifications now stack neatly instead of overlapping.",
+        ],
+      },
+      {
+        type: "Improved",
+        items: [
+          "<strong>Faster Language Detection</strong>: Code language is detected quicker with less memory usage.",
+          "<strong>Faster Code Scanning</strong>: Improved performance when scanning code for formatting.",
+          "<strong>More File Types</strong>: Added support for LESS, JSX, and TSX files.",
+          "<strong>Better Defaults</strong>: Python, YAML, TOML, and other languages now use correct formatting defaults.",
+          "<strong>Settings Page</strong>: Cleaner settings with less code duplication.",
+        ],
+      },
+      {
+        type: "Fixed",
+        items: [
+          "<strong>Settings Not Saving</strong>: Fixed a bug where some settings could be lost when loading.",
+          "<strong>Memory Leak</strong>: Fixed a memory leak when tabs are closed.",
+        ],
+      },
+    ],
+  },
+];
 
 // ============================================================================
 // HTML Sanitization
@@ -198,6 +216,44 @@ function createHeader(): DocumentFragment {
 }
 
 /**
+ * Renders a previously released changelog entry below the current release.
+ * Visually demoted compared to the current version.
+ */
+function createReleaseBlock(release: ChangelogData): HTMLDivElement {
+  const block: HTMLDivElement = document.createElement("div");
+  block.className = "previous-release";
+
+  const heading: HTMLHeadingElement = document.createElement("h2");
+  heading.style.cssText =
+    "color: #ccc; margin-top: 40px; border-top: 1px solid #444; padding-top: 20px;";
+  heading.textContent = `v${release.version} — ${release.date}`;
+  block.appendChild(heading);
+
+  release.changes.forEach((entry: ChangeEntry): void => {
+    const section: HTMLDivElement = document.createElement("div");
+    section.className = "change-section";
+
+    const sectionTitle: HTMLHeadingElement = document.createElement("h3");
+    sectionTitle.textContent = entry.type;
+    section.appendChild(sectionTitle);
+
+    const list: HTMLUListElement = document.createElement("ul");
+    entry.items.forEach((item: string): void => {
+      const li: HTMLLIElement = document.createElement("li");
+      const sanitized: DocumentFragment = sanitizeHtml(item);
+      while (sanitized.firstChild) {
+        li.appendChild(sanitized.firstChild);
+      }
+      list.appendChild(li);
+    });
+    section.appendChild(list);
+    block.appendChild(section);
+  });
+
+  return block;
+}
+
+/**
  * Creates a section for a single change category
  *
  * @param entry - The change entry to render
@@ -270,6 +326,11 @@ function renderChangelog(container: HTMLElement): void {
   // Add each change section with staggered animation
   changelogData.changes.forEach((entry: ChangeEntry, index: number): void => {
     fragment.appendChild(createChangeSection(entry, index));
+  });
+
+  // Render prior releases below the current one (read-only history)
+  previousReleases.forEach((release: ChangelogData): void => {
+    fragment.appendChild(createReleaseBlock(release));
   });
 
   // Add footer section

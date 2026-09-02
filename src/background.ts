@@ -543,59 +543,24 @@ function initializeExtension(): void {
 }
 
 /**
- * Opens the changelog page in a new tab
+ * Records the current extension version in local storage on install/update.
+ *
+ * This intentionally does NOT open any tab or otherwise touch the user's
+ * browser chrome. Earlier versions auto-opened `changelog.html` in a new tab
+ * on every install/update, which hijacked the browser homepage / new tab for
+ * users with custom `browser.startup.homepage` / `browser.newtab.url` prefs
+ * (see issue #5). The changelog remains reachable via the "What's New" link
+ * in the options page.
  */
-function openChangelog(): void {
-  chrome.tabs.create({
-    url: chrome.runtime.getURL("changelog.html"),
-  });
-}
-
-/**
- * Checks if changelog should be shown based on version changes
- * @param reason - The install reason (install, update, etc.)
- */
-function handleInstallOrUpdate(
-  _reason: chrome.runtime.OnInstalledReason,
-): void {
-  // We track the version in storage, so we don't need the reason parameter
-  // The changelog is shown regardless of install or update
+function recordInstalledVersion(): void {
   const currentVersion = chrome.runtime.getManifest().version;
 
-  chrome.storage.local.get(["lastSeenVersion"], (result) => {
-    // Check for runtime errors
+  chrome.storage.local.set({ lastSeenVersion: currentVersion }, () => {
     if (chrome.runtime.lastError) {
       console.error(
-        "[Code Formatter] Storage read error:",
+        "[Code Formatter] Storage write error:",
         chrome.runtime.lastError.message,
       );
-      return;
-    }
-
-    const lastSeenVersion = result.lastSeenVersion;
-
-    // Show changelog if:
-    // 1. First installation (no lastSeenVersion)
-    // 2. Version has changed (update)
-    if (!lastSeenVersion || lastSeenVersion !== currentVersion) {
-      console.log(
-        `[Code Formatter] Showing changelog: ${lastSeenVersion || "none"} → ${currentVersion}`,
-      );
-
-      // Open changelog after a short delay to ensure extension is ready
-      setTimeout(() => {
-        openChangelog();
-      }, 500);
-
-      // Store current version as last seen
-      chrome.storage.local.set({ lastSeenVersion: currentVersion }, () => {
-        if (chrome.runtime.lastError) {
-          console.error(
-            "[Code Formatter] Storage write error:",
-            chrome.runtime.lastError.message,
-          );
-        }
-      });
     }
   });
 }
@@ -624,9 +589,7 @@ chrome.runtime.onInstalled.addListener((details) => {
     console.log(`[Code Formatter] Updated from ${details.previousVersion}`);
   }
 
-  // Handle changelog display for both install and update
-  handleInstallOrUpdate(reason);
-
+  recordInstalledVersion();
   initializeExtension();
 });
 
